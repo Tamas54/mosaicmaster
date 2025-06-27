@@ -1,3 +1,17 @@
+// Global fetch interceptor to ensure all API calls use relative URLs
+const originalFetch = window.fetch;
+window.fetch = function(url, options) {
+  // If URL contains the production domain, strip it to make it relative
+  if (typeof url === 'string' && url.includes('mosaicmaster-production.up.railway.app')) {
+    url = url.replace(/https?:\/\/mosaicmaster-production\.up\.railway\.app/g, '');
+  }
+  // Ensure API URLs are relative
+  if (typeof url === 'string' && url.match(/^https?:\/\/.*\/api\//)) {
+    url = url.replace(/^https?:\/\/[^\/]+/, '');
+  }
+  return originalFetch.call(this, url, options);
+};
+
 document.addEventListener("DOMContentLoaded", function() {
   console.log("tryitnow.js loaded");
   
@@ -337,7 +351,9 @@ document.addEventListener("DOMContentLoaded", function() {
     statusText.textContent = "";
   
     try {
-      const response = await fetch(endpoint, {
+      // Ensure endpoint is always relative to avoid mixed content issues
+      const relativeEndpoint = endpoint.startsWith('/') ? endpoint : '/' + endpoint;
+      const response = await fetch(relativeEndpoint, {
         method: "POST",
         body: formData,
       });
