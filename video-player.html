@@ -1,0 +1,2435 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Königstiger | Videólejátszó és Letöltő</title>
+
+  <!-- SEO Meta Tags -->
+  <meta name="description" content="Königstiger fejlett videólejátszó, ami támogatja az AVI, MKV, MP4, WebM formátumokat, valamint a hang- és feliratsávokat." />
+  <meta name="robots" content="index, follow" />
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- HLS.js a HLS streamek támogatásához -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+
+  <style>
+    :root {
+      --primary-color: #0D1B2A;
+      --secondary-color: #D4AF37;
+      --accent-color: #A4161A;
+      --video-accent: #2563eb;
+    }
+    /* Global mosaic background */
+    .background-image {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: url('/static/ravenna.jpg') no-repeat center center;
+      background-size: cover;
+      opacity: 0.1;
+      z-index: -2;
+    }
+    header {
+      padding: 0.3rem 0;
+      position: relative;
+      background-color: var(--primary-color);
+    }
+    header::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+      height: 100%;
+      background: url('/static/ravenna.jpg') no-repeat center center;
+      background-size: cover;
+      opacity: 0.1;
+      z-index: -1;
+    }
+    
+    /* Panel styles */
+    .panel {
+      background-color: white;
+      border-radius: 0.5rem;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      transition: all 0.3s ease;
+    }
+    
+    /* Drop zone styling */
+    .drop-zone {
+      border: 2px dashed #ccc;
+      border-radius: 8px;
+      transition: all 0.3s ease;
+    }
+    .drop-zone.highlight {
+      border-color: var(--video-accent);
+      background-color: rgba(37, 99, 235, 0.1);
+    }
+    
+    /* Video player styles */
+    .video-container {
+      position: relative;
+      background-color: #000;
+      border-radius: 0.5rem;
+      overflow: hidden;
+    }
+    
+    /* Media controls panel */
+    .media-controls {
+      background-color: rgba(13, 27, 42, 0.8);
+      border-radius: 0.5rem;
+    }
+    
+    /* Video list styles */
+    .video-list-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 1rem;
+    }
+    .video-item {
+      border-radius: 0.5rem;
+      overflow: hidden;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    .video-item:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
+    .thumbnail {
+      aspect-ratio: 16 / 9;
+      object-fit: cover;
+      width: 100%;
+    }
+    
+    /* Status message styling */
+    .status-message {
+      border-radius: 0.5rem;
+      padding: 1rem;
+      margin: 1rem 0;
+    }
+    .status-message.error {
+      background-color: #fee2e2;
+      border-left: 4px solid #ef4444;
+      color: #b91c1c;
+    }
+    .status-message.info {
+      background-color: #dbeafe;
+      border-left: 4px solid #2563eb;
+      color: #1e40af;
+    }
+    .status-message.success {
+      background-color: #dcfce7;
+      border-left: 4px solid #22c55e;
+      color: #15803d;
+    }
+    
+    /* Subtitle text */
+    .subtitle-text {
+      position: absolute;
+      bottom: 50px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: rgba(0, 0, 0, 0.75);
+      color: white;
+      padding: 5px 10px;
+      border-radius: 4px;
+      max-width: 80%;
+      text-align: center;
+      z-index: 10;
+    }
+    
+    /* Controls visibility */
+    .control-visibility {
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    .video-container:hover .control-visibility {
+      opacity: 1;
+    }
+    
+    /* Quality shift notification */
+    .quality-shift-notification {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background-color: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-size: 14px;
+      z-index: 20;
+      animation: fadeOut 3s forwards;
+      animation-delay: J2s;
+    }
+    
+    @keyframes fadeOut {
+      0% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+  </style>
+</head>
+<body class="bg-gray-100 text-gray-900">
+  <!-- Global background mosaic -->
+  <div class="background-image"></div>
+
+  <!-- Header -->
+  <header class="text-white">
+    <div class="container mx-auto px-6 flex justify-between items-center">
+      <a href="/" class="text-2xl font-bold hover:text-[var(--secondary-color)]">Königstiger</a>
+      <nav>
+        <ul class="flex space-x-6">
+          <li><a href="/" class="hover:text-[var(--secondary-color)]">Kezdőlap</a></li>
+          <li><a href="/video-player.html" class="text-[var(--secondary-color)] font-bold">Videólejátszó</a></li>
+          <li><a href="/live-streams.html" class="hover:text-[var(--secondary-color)]">Élő Közvetítések</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="container mx-auto px-6 py-8">
+    <div class="flex items-center mb-6">
+      <i data-lucide="play" class="w-8 h-8 text-[var(--video-accent)] mr-3"></i>
+      <h1 class="text-3xl font-bold">Videólejátszó és Letöltő</h1>
+    </div>
+    
+    <p class="mb-8 text-gray-600">
+      AVI, MKV, MP4 és WebM fájlok lejátszása böngészőben, valamint videók letöltése YouTube, Twitter, Facebook, Instagram, TikTok platformokról fejlett hang- és felirat támogatással.
+    </p>
+  
+    <!-- Upload Panel -->
+    <section class="panel p-6 mb-8">
+      <h2 class="text-xl font-semibold mb-4 flex items-center">
+        <i data-lucide="upload" class="w-5 h-5 mr-2 text-[var(--video-accent)]"></i>
+        Videó feltöltés
+      </h2>
+      
+      <!-- Tabs for Upload or URL Download -->
+      <div class="flex border-b mb-4">
+        <button id="uploadTabButton" class="py-2 px-4 text-center border-b-2 border-[var(--video-accent)] text-[var(--video-accent)] font-medium">
+          <i data-lucide="upload" class="w-4 h-4 inline-block mr-1"></i>
+          Feltöltés
+        </button>
+        <button id="urlTabButton" class="py-2 px-4 text-center border-b-2 border-transparent text-gray-500 hover:text-[var(--video-accent)] font-medium">
+          <i data-lucide="link" class="w-4 h-4 inline-block mr-1"></i>
+          Letöltés URL-ből
+        </button>
+      </div>
+      
+      <!-- Upload Tab Content -->
+      <div id="uploadTabContent">
+        <!-- Drop Zone -->
+        <div id="dropZone" class="drop-zone p-8 text-center cursor-pointer mb-4">
+          <input type="file" id="fileInput" accept=".avi,.mkv,.mp4,.webm" class="hidden">
+          <div class="transform transition-transform">
+            <i data-lucide="upload-cloud" class="w-16 h-16 mx-auto text-[var(--video-accent)] mb-4 opacity-80"></i>
+            <p class="text-lg font-medium text-gray-700">Húzd ide a videó fájlt vagy kattints a feltöltéshez</p>
+            <p class="text-sm text-gray-500 mt-2">Támogatott formátumok: AVI, MKV, MP4, WebM</p>
+          </div>
+        </div>
+        
+        <button id="uploadButton" class="w-full bg-[var(--video-accent)] text-white py-3 rounded-lg hover:bg-blue-600 transition flex items-center justify-center">
+          <i data-lucide="upload" class="w-5 h-5 mr-2"></i>
+          Feltöltés
+        </button>
+      </div>
+      
+      <!-- URL Download Tab Content -->
+      <div id="urlTabContent" class="hidden">
+        <div class="mb-4">
+          <label for="videoUrl" class="block font-medium text-gray-700 mb-2">Videó URL</label>
+          <input type="url" id="videoUrl" placeholder="https://www.youtube.com/watch?v=..." 
+                 class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--video-accent)] focus:border-transparent">
+          <p class="text-sm text-gray-500 mt-1">Támogatott platformok: YouTube, Twitter, Facebook, Instagram, TikTok</p>
+        </div>
+        
+        <div class="mb-4">
+          <label class="block font-medium text-gray-700 mb-2">Platform (opcionális)</label>
+          <div class="grid grid-cols-3 gap-2">
+            <button class="platform-btn p-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition" data-platform="youtube">
+              <i data-lucide="youtube" class="w-5 h-5 mx-auto mb-1"></i>
+              <div class="text-xs">YouTube</div>
+            </button>
+            <button class="platform-btn p-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition" data-platform="twitter">
+              <i data-lucide="twitter" class="w-5 h-5 mx-auto mb-1"></i>
+              <div class="text-xs">Twitter</div>
+            </button>
+            <button class="platform-btn p-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition" data-platform="facebook">
+              <i data-lucide="facebook" class="w-5 h-5 mx-auto mb-1"></i>
+              <div class="text-xs">Facebook</div>
+            </button>
+            <button class="platform-btn p-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition" data-platform="auto" data-active="true">
+              <i data-lucide="globe" class="w-5 h-5 mx-auto mb-1"></i>
+              <div class="text-xs">Automatikus</div>
+            </button>
+            <button class="platform-btn p-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition" data-platform="tiktok">
+              <i data-lucide="music" class="w-5 h-5 mx-auto mb-1"></i>
+              <div class="text-xs">TikTok</div>
+            </button>
+            <button class="platform-btn p-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition" data-platform="other">
+              <i data-lucide="more-horizontal" class="w-5 h-5 mx-auto mb-1"></i>
+              <div class="text-xs">Egyéb</div>
+            </button>
+          </div>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-2 mb-2">
+          <button id="downloadButton" class="bg-[var(--video-accent)] text-white py-3 rounded-lg hover:bg-blue-600 transition flex items-center justify-center">
+            <i data-lucide="download-cloud" class="w-5 h-5 mr-2"></i>
+            Letöltés és lejátszás
+          </button>
+          
+          <button id="downloadOnlyButton" class="bg-gradient-to-r from-purple-500 to-indigo-600 text-white py-3 rounded-lg hover:from-purple-600 hover:to-indigo-700 transition flex items-center justify-center">
+            <i data-lucide="download" class="w-5 h-5 mr-2"></i>
+            Csak letöltés
+          </button>
+
+          <button id="downloadAudioButton" class="bg-gradient-to-r from-green-500 to-teal-600 text-white py-3 rounded-lg hover:from-green-600 hover:to-teal-700 transition flex items-center justify-center">
+            <i data-lucide="music" class="w-5 h-5 mr-2"></i>
+            Csak hang letöltése
+          </button>
+
+          <button id="systemDownloadButton" class="bg-gradient-to-r from-amber-500 to-orange-600 text-white py-3 rounded-lg hover:from-amber-600 hover:to-orange-700 transition flex items-center justify-center">
+            <i data-lucide="hard-drive-download" class="w-5 h-5 mr-2"></i>
+            Letöltés rendszermappába
+          </button>
+        </div>
+        
+        <div class="border-t border-gray-200 pt-2 mt-2">
+          <p class="font-medium text-gray-700 mb-2">Átiratolás és leirat opciók:</p>
+          
+          <!-- Format selection dropdown -->
+          <div class="mb-3">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Leirat formátum:</label>
+            <select id="downloadTranscriptFormatSelect" class="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--video-accent)] focus:border-transparent">
+              <option value="txt">Egyszerű szöveg (TXT)</option>
+              <option value="srt">Felirat formátum (SRT)</option>
+              <option value="vtt">Web felirat formátum (VTT)</option>
+              <option value="docx">Word dokumentum (DOCX)</option>
+              <option value="pdf">PDF dokumentum (PDF)</option>
+            </select>
+          </div>
+          
+          <div class="grid grid-cols-2 gap-2">
+            <button id="transcriptButton" class="bg-gray-200 text-gray-800 py-2 rounded-lg hover:bg-gray-300 transition flex items-center justify-center">
+              <i data-lucide="file-text" class="w-4 h-4 mr-2"></i>
+              Csak leirat
+            </button>
+            
+            <button id="timecodedTranscriptButton" class="bg-gray-200 text-gray-800 py-2 rounded-lg hover:bg-gray-300 transition flex items-center justify-center">
+              <i data-lucide="timer" class="w-4 h-4 mr-2"></i>
+              Time-kódos leirat
+            </button>
+            
+            <button id="speakerTranscriptButton" class="bg-gray-200 text-gray-800 py-2 rounded-lg hover:bg-gray-300 transition flex items-center justify-center">
+              <i data-lucide="user-round" class="w-4 h-4 mr-2"></i>
+              Beszélőfelismerés
+            </button>
+            
+            <button id="fullTranscriptButton" class="bg-gray-200 text-gray-800 py-2 rounded-lg hover:bg-gray-300 transition flex items-center justify-center">
+              <i data-lucide="group" class="w-4 h-4 mr-2"></i>
+              Beszélős time-kódos leirat
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Status Message -->
+      <div id="statusMessage" class="status-message hidden mt-4"></div>
+    </section>
+    
+    <!-- Video Player Panel -->
+    <section id="playerContainer" class="panel p-6 mb-8 hidden">
+      <h2 id="videoTitle" class="text-xl font-semibold mb-2"></h2>
+      <p id="videoInfo" class="text-sm text-gray-500 mb-1"></p>
+      <p id="videoSource" class="text-sm text-purple-500 mb-4 hidden"></p>
+      
+      <!-- Video Container -->
+      <div class="video-container mb-4">
+        <video id="videoPlayer" controls class="w-full h-full max-h-[70vh]"></video>
+        <button id="playButton" class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white bg-opacity-75 text-[var(--primary-color)] rounded-full w-16 h-16 flex items-center justify-center hidden">
+          <i data-lucide="play" class="w-8 h-8"></i>
+        </button>
+        <div id="subtitleDisplay" class="subtitle-text hidden"></div>
+        <!-- Loading indicator will be injected here by JS -->
+      </div>
+      
+      <!-- Transcription Tools Panel -->
+      <div class="bg-gray-100 rounded-lg p-4 mb-4 border border-gray-200">
+        <h3 class="text-lg font-medium mb-2 flex items-center">
+          <i data-lucide="file-text" class="w-4 h-4 mr-2 text-[var(--video-accent)]"></i>
+          Leirat funkciók
+        </h3>
+        
+        <!-- Format selection dropdown -->
+        <div class="mb-3">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Leirat formátum kiválasztása:</label>
+          <select id="transcriptFormatSelect" class="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--video-accent)] focus:border-transparent">
+            <option value="txt">Egyszerű szöveg (TXT)</option>
+            <option value="srt">Felirat formátum (SRT)</option>
+            <option value="vtt">Web felirat formátum (VTT)</option>
+            <option value="docx">Word dokumentum (DOCX)</option>
+            <option value="pdf">PDF dokumentum (PDF)</option>
+          </select>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-2">
+          <button id="videoTranscriptButton" class="bg-white text-gray-800 py-2 rounded-lg hover:bg-gray-50 border border-gray-300 transition flex items-center justify-center">
+            <i data-lucide="file-text" class="w-4 h-4 mr-2"></i>
+            Egyszerű leirat
+          </button>
+          
+          <button id="videoTimecodedTranscriptButton" class="bg-white text-gray-800 py-2 rounded-lg hover:bg-gray-50 border border-gray-300 transition flex items-center justify-center">
+            <i data-lucide="timer" class="w-4 h-4 mr-2"></i>
+            Time-kódos leirat
+          </button>
+          
+          <button id="videoSpeakerTranscriptButton" class="bg-white text-gray-800 py-2 rounded-lg hover:bg-gray-50 border border-gray-300 transition flex items-center justify-center">
+            <i data-lucide="user-round" class="w-4 h-4 mr-2"></i>
+            Beszélőfelismerés
+          </button>
+          
+          <button id="videoFullTranscriptButton" class="bg-white text-gray-800 py-2 rounded-lg hover:bg-gray-50 border border-gray-300 transition flex items-center justify-center">
+            <i data-lucide="group" class="w-4 h-4 mr-2"></i>
+            Beszélős time-kódos leirat
+          </button>
+        </div>
+      </div>
+      
+      <!-- Media Controls Panel -->
+      <div class="media-controls p-4 text-white hidden">
+        <div class="flex flex-wrap items-center justify-center gap-6">
+          <!-- Audio Track Select -->
+          <div class="flex items-center space-x-2">
+            <i data-lucide="volume-2" class="w-5 h-5 text-gray-300"></i>
+            <select id="audioTrackSelect" class="bg-gray-700 border-none rounded px-3 py-2 text-white text-sm focus:ring-[var(--secondary-color)]">
+              <option value="">Hang betöltése...</option>
+            </select>
+          </div>
+          
+          <!-- Subtitle Track Select -->
+          <div class="flex items-center space-x-2">
+            <i data-lucide="subtitles" class="w-5 h-5 text-gray-300"></i>
+            <select id="subtitleTrackSelect" class="bg-gray-700 border-none rounded px-3 py-2 text-white text-sm focus:ring-[var(--secondary-color)]">
+              <option value="off">Felirat kikapcsolva</option>
+            </select>
+          </div>
+          
+          <!-- Quality Select -->
+          <div class="flex items-center space-x-2">
+            <i data-lucide="settings" class="w-5 h-5 text-gray-300"></i>
+            <select id="qualitySelect" class="bg-gray-700 border-none rounded px-3 py-2 text-white text-sm focus:ring-[var(--secondary-color)]">
+              <option value="auto">Automatikus minőség</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </section>
+    
+    <!-- Video Library -->
+    <section class="panel p-6">
+      <h2 class="text-xl font-semibold mb-6 flex items-center">
+        <i data-lucide="library" class="w-5 h-5 mr-2 text-[var(--video-accent)]"></i>
+        Aktív videók
+      </h2>
+      
+      <div id="videoList" class="video-list-container">
+        <p id="noVideosMessage" class="col-span-full text-center text-gray-500 py-8">Még nincs feltöltött videó</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-[var(--primary-color)] text-white py-6 mt-8">
+    <div class="container mx-auto px-6 text-center">
+      <p>&copy; 2025 Königstiger GmbH. Minden jog fenntartva.</p>
+    </div>
+  </footer>
+
+  <!-- JavaScript -->
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // Activate Lucide Icons
+      lucide.createIcons();
+      
+      // API alap URL
+      const API_URL = '/api';
+      let currentVideo = null;
+      
+      // Audio és felirat kezelő - globális változók
+      let currentMediaInfo = null;
+      let currentSubtitleTrack = null;
+      let currentAudioTrack = 0;
+      let subtitleDisplay = document.getElementById('subtitleDisplay');
+      let currentQualityLevel = 'auto';
+      
+      // Tab switching functionality
+      const uploadTabButton = document.getElementById('uploadTabButton');
+      const urlTabButton = document.getElementById('urlTabButton');
+      const uploadTabContent = document.getElementById('uploadTabContent');
+      const urlTabContent = document.getElementById('urlTabContent');
+      
+      // Tab switching event listeners
+      uploadTabButton.addEventListener('click', () => {
+        // Activate upload tab
+        uploadTabButton.classList.add('border-[var(--video-accent)]', 'text-[var(--video-accent)]');
+        uploadTabButton.classList.remove('border-transparent', 'text-gray-500');
+        // Deactivate URL tab
+        urlTabButton.classList.remove('border-[var(--video-accent)]', 'text-[var(--video-accent)]');
+        urlTabButton.classList.add('border-transparent', 'text-gray-500');
+        // Show/hide content
+        uploadTabContent.classList.remove('hidden');
+        urlTabContent.classList.add('hidden');
+      });
+      
+      urlTabButton.addEventListener('click', () => {
+        // Activate URL tab
+        urlTabButton.classList.add('border-[var(--video-accent)]', 'text-[var(--video-accent)]');
+        urlTabButton.classList.remove('border-transparent', 'text-gray-500');
+        // Deactivate upload tab
+        uploadTabButton.classList.remove('border-[var(--video-accent)]', 'text-[var(--video-accent)]');
+        uploadTabButton.classList.add('border-transparent', 'text-gray-500');
+        // Show/hide content
+        urlTabContent.classList.remove('hidden');
+        uploadTabContent.classList.add('hidden');
+      });
+      
+      // URL download functionality
+      const videoUrlInput = document.getElementById('videoUrl');
+      const downloadButton = document.getElementById('downloadButton');
+      const platformButtons = document.querySelectorAll('.platform-btn');
+      let selectedPlatform = 'auto';
+      
+      // Platform button click handler
+      platformButtons.forEach(button => {
+        // Set initial active state
+        if (button.dataset.active === 'true') {
+          button.classList.add('bg-blue-50', 'border-[var(--video-accent)]');
+        }
+        
+        button.addEventListener('click', () => {
+          // Remove active state from all buttons
+          platformButtons.forEach(btn => {
+            btn.classList.remove('bg-blue-50', 'border-[var(--video-accent)]');
+            delete btn.dataset.active;
+          });
+          
+          // Add active state to clicked button
+          button.classList.add('bg-blue-50', 'border-[var(--video-accent)]');
+          button.dataset.active = 'true';
+          
+          // Set selected platform
+          selectedPlatform = button.dataset.platform;
+        });
+      });
+      
+      // Közös videoURL validáló funkció
+      function validateVideoUrl(url) {
+        if (!url) {
+          showStatus('Kérlek add meg a videó URL-jét', 'error');
+          return false;
+        }
+        
+        // Validate URL format
+        if (!url.startsWith('http')) {
+          showStatus('Érvénytelen URL formátum. Helyes formátum: https://...', 'error');
+          return false;
+        }
+        
+        return true;
+      }
+      
+      // Közös letöltés funkció
+      async function downloadVideoFromUrl(url, platform, processVideo = true) {
+        // Azonosítjuk a megfelelő végpontot a feldolgozás alapján
+        const endpoint = processVideo ? 'download-video' : 'download-video-only';
+        
+        // Disable buttons during download
+        downloadButton.disabled = true;
+        downloadOnlyButton.disabled = true;
+        downloadAudioButton.disabled = true;
+        systemDownloadButton.disabled = true;
+        transcriptButton.disabled = true;
+        timecodedTranscriptButton.disabled = true;
+        speakerTranscriptButton.disabled = true;
+        fullTranscriptButton.disabled = true;
+        
+        // Frissítjük a gombok megjelenését
+        const activeButton = processVideo ? downloadButton : downloadOnlyButton;
+        
+        activeButton.innerHTML = '<i data-lucide="loader" class="w-5 h-5 mr-2 animate-spin"></i> Letöltés...';
+        downloadButton.classList.add('opacity-50');
+        downloadOnlyButton.classList.add('opacity-50');
+        downloadAudioButton.classList.add('opacity-50');
+        systemDownloadButton.classList.add('opacity-50');
+        transcriptButton.classList.add('opacity-50');
+        timecodedTranscriptButton.classList.add('opacity-50');
+        speakerTranscriptButton.classList.add('opacity-50');
+        fullTranscriptButton.classList.add('opacity-50');
+        activeButton.classList.remove('opacity-50');
+        lucide.createIcons();
+        
+        // Show status message
+        const statusMessage = processVideo 
+          ? 'Videó letöltése és feldolgozása folyamatban...' 
+          : 'Csak a videó letöltése folyamatban...';
+        showStatus(statusMessage, 'info');
+        
+        try {
+          // Send download request to API
+          const response = await fetch(`${API_URL}/${endpoint}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              url: url,
+              platform: platform
+            })
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || 'Letöltési hiba történt');
+          }
+          
+          const videoInfo = await response.json();
+          
+          if (videoInfo.status === 'downloading' || videoInfo.status === 'processing') {
+            const statusMsg = processVideo 
+              ? 'Videó letöltése és feldolgozása folyamatban...' 
+              : 'Videó letöltése folyamatban...';
+            
+            showStatus(statusMsg, 'info');
+            
+            // Poll for status
+            await pollDownloadStatus(videoInfo.id);
+          } else {
+            const successMsg = processVideo 
+              ? 'Letöltés és feldolgozás sikeres' 
+              : 'Letöltés sikeres';
+            
+            showStatus(successMsg, 'success');
+          }
+          
+          // Clear form
+          videoUrlInput.value = '';
+          
+          // Refresh video list
+          loadVideos();
+          
+        } catch (error) {
+          console.error('Letöltési hiba:', error);
+          showStatus(`Hiba történt a letöltés során: ${error.message}`, 'error');
+        } finally {
+          // Reset button states
+          downloadButton.disabled = false;
+          downloadOnlyButton.disabled = false;
+          downloadAudioButton.disabled = false;
+          systemDownloadButton.disabled = false;
+          transcriptButton.disabled = false;
+          timecodedTranscriptButton.disabled = false;
+          speakerTranscriptButton.disabled = false;
+          fullTranscriptButton.disabled = false;
+          
+          downloadButton.innerHTML = '<i data-lucide="download-cloud" class="w-5 h-5 mr-2"></i> Letöltés és lejátszás';
+          downloadOnlyButton.innerHTML = '<i data-lucide="download" class="w-5 h-5 mr-2"></i> Csak letöltés';
+          downloadButton.classList.remove('opacity-50');
+          downloadOnlyButton.classList.remove('opacity-50');
+          downloadAudioButton.classList.remove('opacity-50');
+          systemDownloadButton.classList.remove('opacity-50');
+          transcriptButton.classList.remove('opacity-50');
+          timecodedTranscriptButton.classList.remove('opacity-50');
+          speakerTranscriptButton.classList.remove('opacity-50');
+          fullTranscriptButton.classList.remove('opacity-50');
+          lucide.createIcons();
+        }
+      }
+      
+      // Csak hang letöltése funkció
+      async function downloadAudioFromUrl(url, platform) {
+        // Disable buttons during download
+        downloadButton.disabled = true;
+        downloadOnlyButton.disabled = true;
+        downloadAudioButton.disabled = true;
+        systemDownloadButton.disabled = true;
+        transcriptButton.disabled = true;
+        timecodedTranscriptButton.disabled = true;
+        speakerTranscriptButton.disabled = true;
+        fullTranscriptButton.disabled = true;
+        
+        // Frissítjük a gombok megjelenését
+        downloadAudioButton.innerHTML = '<i data-lucide="loader" class="w-5 h-5 mr-2 animate-spin"></i> Letöltés...';
+        downloadButton.classList.add('opacity-50');
+        downloadOnlyButton.classList.add('opacity-50');
+        systemDownloadButton.classList.add('opacity-50');
+        transcriptButton.classList.add('opacity-50');
+        timecodedTranscriptButton.classList.add('opacity-50');
+        speakerTranscriptButton.classList.add('opacity-50');
+        fullTranscriptButton.classList.add('opacity-50');
+        downloadAudioButton.classList.remove('opacity-50');
+        lucide.createIcons();
+        
+        // Show status message
+        showStatus('Hang letöltése folyamatban...', 'info');
+        
+        try {
+          // Send download request to API
+          const response = await fetch(`${API_URL}/download-audio`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              url: url,
+              platform: platform
+            })
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || 'Hang letöltési hiba történt');
+          }
+          
+          const audioInfo = await response.json();
+          
+          if (audioInfo.status === 'downloading' || audioInfo.status === 'processing') {
+            showStatus('Hang letöltése és feldolgozása folyamatban...', 'info');
+            
+            // Poll for status
+            await pollDownloadStatus(audioInfo.id);
+          } else {
+            showStatus('Hang letöltése sikeres', 'success');
+          }
+          
+          // Clear form
+          videoUrlInput.value = '';
+          
+          // Refresh video list
+          loadVideos();
+          
+        } catch (error) {
+          console.error('Hang letöltési hiba:', error);
+          showStatus(`Hiba történt a hang letöltése során: ${error.message}`, 'error');
+        } finally {
+          // Reset button states
+          downloadButton.disabled = false;
+          downloadOnlyButton.disabled = false;
+          downloadAudioButton.disabled = false;
+          systemDownloadButton.disabled = false;
+          transcriptButton.disabled = false;
+          timecodedTranscriptButton.disabled = false;
+          speakerTranscriptButton.disabled = false;
+          fullTranscriptButton.disabled = false;
+          
+          downloadAudioButton.innerHTML = '<i data-lucide="music" class="w-5 h-5 mr-2"></i> Csak hang letöltése';
+          downloadButton.classList.remove('opacity-50');
+          downloadOnlyButton.classList.remove('opacity-50');
+          downloadAudioButton.classList.remove('opacity-50');
+          systemDownloadButton.classList.remove('opacity-50');
+          transcriptButton.classList.remove('opacity-50');
+          timecodedTranscriptButton.classList.remove('opacity-50');
+          speakerTranscriptButton.classList.remove('opacity-50');
+          fullTranscriptButton.classList.remove('opacity-50');
+          lucide.createIcons();
+        }
+      }
+      
+      // Rendszermappába letöltés funkció
+      async function downloadVideoToSystem(url, platform) {
+        // Disable buttons during download
+        downloadButton.disabled = true;
+        downloadOnlyButton.disabled = true;
+        downloadAudioButton.disabled = true;
+        systemDownloadButton.disabled = true;
+        transcriptButton.disabled = true;
+        timecodedTranscriptButton.disabled = true;
+        speakerTranscriptButton.disabled = true;
+        fullTranscriptButton.disabled = true;
+        
+        // Frissítjük a gombok megjelenését
+        systemDownloadButton.innerHTML = '<i data-lucide="loader" class="w-5 h-5 mr-2 animate-spin"></i> Letöltés...';
+        downloadButton.classList.add('opacity-50');
+        downloadOnlyButton.classList.add('opacity-50');
+        downloadAudioButton.classList.add('opacity-50');
+        transcriptButton.classList.add('opacity-50');
+        timecodedTranscriptButton.classList.add('opacity-50');
+        speakerTranscriptButton.classList.add('opacity-50');
+        fullTranscriptButton.classList.add('opacity-50');
+        systemDownloadButton.classList.remove('opacity-50');
+        lucide.createIcons();
+        
+        // Show status message
+        showStatus('Rendszermappába letöltés folyamatban...', 'info');
+        
+        try {
+          // Send download request to API
+          const response = await fetch(`${API_URL}/download-system`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              url: url,
+              platform: platform
+            })
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || 'Rendszermappába letöltés hiba történt');
+          }
+          
+          const downloadInfo = await response.json();
+          
+          if (downloadInfo.status === 'downloading' || downloadInfo.status === 'processing') {
+            showStatus('Rendszermappába letöltés folyamatban...', 'info');
+            
+            // Poll for status
+            await pollDownloadStatus(downloadInfo.id);
+          } else {
+            showStatus('Rendszermappába letöltés sikeres', 'success');
+          }
+          
+          // Clear form
+          videoUrlInput.value = '';
+          
+        } catch (error) {
+          console.error('Rendszermappába letöltés hiba:', error);
+          showStatus(`Hiba történt a rendszermappába letöltés során: ${error.message}`, 'error');
+        } finally {
+          // Reset button states
+          downloadButton.disabled = false;
+          downloadOnlyButton.disabled = false;
+          downloadAudioButton.disabled = false;
+          systemDownloadButton.disabled = false;
+          transcriptButton.disabled = false;
+          timecodedTranscriptButton.disabled = false;
+          speakerTranscriptButton.disabled = false;
+          fullTranscriptButton.disabled = false;
+          
+          systemDownloadButton.innerHTML = '<i data-lucide="hard-drive-download" class="w-5 h-5 mr-2"></i> Letöltés rendszermappába';
+          downloadButton.classList.remove('opacity-50');
+          downloadOnlyButton.classList.remove('opacity-50');
+          downloadAudioButton.classList.remove('opacity-50');
+          systemDownloadButton.classList.remove('opacity-50');
+          transcriptButton.classList.remove('opacity-50');
+          timecodedTranscriptButton.classList.remove('opacity-50');
+          speakerTranscriptButton.classList.remove('opacity-50');
+          fullTranscriptButton.classList.remove('opacity-50');
+          lucide.createIcons();
+        }
+      }
+      
+      // Átiratolás és leirat generálás
+      async function generateTranscript(url, platform, options = {}) {
+        const { timecoded = false, speakers = false } = options;
+        
+        // Get selected format
+        const formatSelector = document.getElementById('downloadTranscriptFormatSelect') || document.getElementById('transcriptFormatSelect');
+        const outputFormat = formatSelector ? formatSelector.value || 'txt' : 'txt';
+        
+        // Disable buttons during process
+        downloadButton.disabled = true;
+        downloadOnlyButton.disabled = true;
+        downloadAudioButton.disabled = true;
+        systemDownloadButton.disabled = true;
+        transcriptButton.disabled = true;
+        timecodedTranscriptButton.disabled = true;
+        speakerTranscriptButton.disabled = true;
+        fullTranscriptButton.disabled = true;
+        
+        // Frissítjük a gombok megjelenését
+        let activeButton;
+        if (!timecoded && !speakers) activeButton = transcriptButton;
+        else if (timecoded && !speakers) activeButton = timecodedTranscriptButton;
+        else if (!timecoded && speakers) activeButton = speakerTranscriptButton;
+        else activeButton = fullTranscriptButton;
+        
+        activeButton.innerHTML = '<i data-lucide="loader" class="w-4 h-4 mr-2 animate-spin"></i> Feldolgozás...';
+        downloadButton.classList.add('opacity-50');
+        downloadOnlyButton.classList.add('opacity-50');
+        downloadAudioButton.classList.add('opacity-50');
+        systemDownloadButton.classList.add('opacity-50');
+        transcriptButton.classList.add('opacity-50');
+        timecodedTranscriptButton.classList.add('opacity-50');
+        speakerTranscriptButton.classList.add('opacity-50');
+        fullTranscriptButton.classList.add('opacity-50');
+        activeButton.classList.remove('opacity-50');
+        lucide.createIcons();
+        
+        // Show status message
+        const statusMsg = speakers 
+          ? `Beszélőfelismeréses leirat készítése (${outputFormat.toUpperCase()})...` 
+          : `Átiratolás folyamatban (${outputFormat.toUpperCase()})...`;
+        showStatus(statusMsg, 'info');
+        
+        try {
+          // Send transcription request to API
+          const response = await fetch(`${API_URL}/transcribe-url`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              url: url,
+              platform: platform,
+              timecoded: timecoded,
+              identify_speakers: speakers,
+              output_format: outputFormat,
+              fast_mode: true // Gyors feldolgozási mód engedélyezése a jobb felhasználói élmény érdekében
+            })
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || 'Leirat készítési hiba történt');
+          }
+          
+          const transcriptInfo = await response.json();
+          
+          if (transcriptInfo.status === 'processing') {
+            showStatus(`Leirat készítése folyamatban (${outputFormat.toUpperCase()})...`, 'info');
+            
+            // Poll for status
+            await pollTranscriptionStatus(transcriptInfo.id);
+          } else {
+            showStatus(`${outputFormat.toUpperCase()} leirat elkészült!`, 'success');
+            
+            // Offer download link if available
+            if (transcriptInfo.download_url) {
+              const downloadLink = document.createElement('a');
+              downloadLink.href = transcriptInfo.download_url;
+              downloadLink.download = '';
+              downloadLink.click();
+            }
+          }
+          
+          // Clear form
+          videoUrlInput.value = '';
+          
+        } catch (error) {
+          console.error('Leirat készítési hiba:', error);
+          showStatus(`Hiba történt a leirat készítése során: ${error.message}`, 'error');
+        } finally {
+          // Reset button states
+          downloadButton.disabled = false;
+          downloadOnlyButton.disabled = false;
+          downloadAudioButton.disabled = false;
+          systemDownloadButton.disabled = false;
+          transcriptButton.disabled = false;
+          timecodedTranscriptButton.disabled = false;
+          speakerTranscriptButton.disabled = false;
+          fullTranscriptButton.disabled = false;
+          
+          // Reset button texts
+          transcriptButton.innerHTML = '<i data-lucide="file-text" class="w-4 h-4 mr-2"></i> Csak leirat';
+          timecodedTranscriptButton.innerHTML = '<i data-lucide="timer" class="w-4 h-4 mr-2"></i> Time-kódos leirat';
+          speakerTranscriptButton.innerHTML = '<i data-lucide="user-round" class="w-4 h-4 mr-2"></i> Beszélőfelismerés';
+          fullTranscriptButton.innerHTML = '<i data-lucide="group" class="w-4 h-4 mr-2"></i> Beszélős time-kódos leirat';
+          
+          downloadButton.classList.remove('opacity-50');
+          downloadOnlyButton.classList.remove('opacity-50');
+          downloadAudioButton.classList.remove('opacity-50');
+          systemDownloadButton.classList.remove('opacity-50');
+          transcriptButton.classList.remove('opacity-50');
+          timecodedTranscriptButton.classList.remove('opacity-50');
+          speakerTranscriptButton.classList.remove('opacity-50');
+          fullTranscriptButton.classList.remove('opacity-50');
+          lucide.createIcons();
+        }
+      }
+      
+      // Leirat státusz ellenőrzése
+      async function pollTranscriptionStatus(transcriptId) {
+        let isReady = false;
+        let attempts = 0;
+        const maxAttempts = 120; // 10 perc (5s * 120)
+        
+        while (!isReady && attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          
+          try {
+            const response = await fetch(`${API_URL}/transcription-status/${transcriptId}`);
+            if (!response.ok) throw new Error('Státusz ellenőrzési hiba');
+            
+            const statusInfo = await response.json();
+            
+            if (statusInfo.status === 'completed') {
+              showStatus('Leirat elkészült!', 'success');
+              isReady = true;
+              
+              // Offer download if available
+              if (statusInfo.download_url) {
+                const downloadLink = document.createElement('a');
+                downloadLink.href = statusInfo.download_url;
+                downloadLink.download = '';
+                downloadLink.click();
+              }
+            } else if (statusInfo.status === 'error') {
+              showStatus(`Hiba történt a leirat készítése során: ${statusInfo.error_message || 'Ismeretlen hiba'}`, 'error');
+              break;
+            } else {
+              // Update progress status
+              showStatus(`Leirat készítése folyamatban... (${attempts+1}/${maxAttempts})`, 'info');
+            }
+            
+            attempts++;
+          } catch (error) {
+            console.error('Leirat státusz ellenőrzési hiba:', error);
+            break;
+          }
+        }
+        
+        if (attempts >= maxAttempts) {
+          showStatus('Időtúllépés a leirat készítésekor. Kérlek próbáld újra később.', 'error');
+        }
+        
+        return isReady;
+      }
+      
+      // Letöltés és feldolgozás gomb
+      downloadButton.addEventListener('click', async () => {
+        const url = videoUrlInput.value.trim();
+        if (!validateVideoUrl(url)) return;
+        await downloadVideoFromUrl(url, selectedPlatform, true);
+      });
+      
+      // Csak letöltés gomb
+      downloadOnlyButton.addEventListener('click', async () => {
+        const url = videoUrlInput.value.trim();
+        if (!validateVideoUrl(url)) return;
+        await downloadVideoFromUrl(url, selectedPlatform, false);
+      });
+
+      // Hang letöltése gomb
+      const downloadAudioButton = document.getElementById('downloadAudioButton');
+      downloadAudioButton.addEventListener('click', async () => {
+        const url = videoUrlInput.value.trim();
+        if (!validateVideoUrl(url)) return;
+        await downloadAudioFromUrl(url, selectedPlatform);
+      });
+
+      // Rendszermappába letöltés gomb
+      const systemDownloadButton = document.getElementById('systemDownloadButton');
+      systemDownloadButton.addEventListener('click', async () => {
+        const url = videoUrlInput.value.trim();
+        if (!validateVideoUrl(url)) return;
+        await downloadVideoToSystem(url, selectedPlatform);
+      });
+
+      // Átiratoló gombok
+      const transcriptButton = document.getElementById('transcriptButton');
+      const timecodedTranscriptButton = document.getElementById('timecodedTranscriptButton');
+      const speakerTranscriptButton = document.getElementById('speakerTranscriptButton');
+      const fullTranscriptButton = document.getElementById('fullTranscriptButton');
+
+      // Csak leirat
+      transcriptButton.addEventListener('click', async () => {
+        const url = videoUrlInput.value.trim();
+        if (!validateVideoUrl(url)) return;
+        await generateTranscript(url, selectedPlatform, {timecoded: false, speakers: false});
+      });
+
+      // Time-kódos leirat
+      timecodedTranscriptButton.addEventListener('click', async () => {
+        const url = videoUrlInput.value.trim();
+        if (!validateVideoUrl(url)) return;
+        await generateTranscript(url, selectedPlatform, {timecoded: true, speakers: false});
+      });
+
+      // Beszélőfelismeréses leirat
+      speakerTranscriptButton.addEventListener('click', async () => {
+        const url = videoUrlInput.value.trim();
+        if (!validateVideoUrl(url)) return;
+        await generateTranscript(url, selectedPlatform, {timecoded: false, speakers: true});
+      });
+
+      // Beszélős time-kódos leirat
+      fullTranscriptButton.addEventListener('click', async () => {
+        const url = videoUrlInput.value.trim();
+        if (!validateVideoUrl(url)) return;
+        await generateTranscript(url, selectedPlatform, {timecoded: true, speakers: true});
+      });
+      
+      // Initialize transcript buttons for video player
+      function initTranscriptButtons() {
+        const videoTranscriptButton = document.getElementById('videoTranscriptButton');
+        const videoTimecodedTranscriptButton = document.getElementById('videoTimecodedTranscriptButton');
+        const videoSpeakerTranscriptButton = document.getElementById('videoSpeakerTranscriptButton');
+        const videoFullTranscriptButton = document.getElementById('videoFullTranscriptButton');
+        
+        // Remove any existing event listeners
+        const newTranscriptButton = videoTranscriptButton.cloneNode(true);
+        const newTimecodedTranscriptButton = videoTimecodedTranscriptButton.cloneNode(true);
+        const newSpeakerTranscriptButton = videoSpeakerTranscriptButton.cloneNode(true);
+        const newFullTranscriptButton = videoFullTranscriptButton.cloneNode(true);
+        
+        videoTranscriptButton.parentNode.replaceChild(newTranscriptButton, videoTranscriptButton);
+        videoTimecodedTranscriptButton.parentNode.replaceChild(newTimecodedTranscriptButton, videoTimecodedTranscriptButton);
+        videoSpeakerTranscriptButton.parentNode.replaceChild(newSpeakerTranscriptButton, videoSpeakerTranscriptButton);
+        videoFullTranscriptButton.parentNode.replaceChild(newFullTranscriptButton, videoFullTranscriptButton);
+        
+        // Add event listeners with current video context
+        newTranscriptButton.addEventListener('click', () => {
+          if (!currentVideo) return;
+          generateVideoTranscript(currentVideo.id, {timecoded: false, speakers: false});
+        });
+        
+        newTimecodedTranscriptButton.addEventListener('click', () => {
+          if (!currentVideo) return;
+          generateVideoTranscript(currentVideo.id, {timecoded: true, speakers: false});
+        });
+        
+        newSpeakerTranscriptButton.addEventListener('click', () => {
+          if (!currentVideo) return;
+          generateVideoTranscript(currentVideo.id, {timecoded: false, speakers: true});
+        });
+        
+        newFullTranscriptButton.addEventListener('click', () => {
+          if (!currentVideo) return;
+          generateVideoTranscript(currentVideo.id, {timecoded: true, speakers: true});
+        });
+        
+        // Re-add lucide icons
+        lucide.createIcons();
+      }
+      
+      // Generate transcript from already uploaded video
+      async function generateVideoTranscript(videoId, options = {}) {
+        const { timecoded = false, speakers = false } = options;
+        
+        // Get selected format
+        const outputFormat = document.getElementById('transcriptFormatSelect') ? 
+                            document.getElementById('transcriptFormatSelect').value || 'txt' : 'txt';
+        
+        // Determine which button to activate
+        let activeButton;
+        const videoTranscriptButton = document.getElementById('videoTranscriptButton');
+        const videoTimecodedTranscriptButton = document.getElementById('videoTimecodedTranscriptButton');
+        const videoSpeakerTranscriptButton = document.getElementById('videoSpeakerTranscriptButton');
+        const videoFullTranscriptButton = document.getElementById('videoFullTranscriptButton');
+        
+        if (!timecoded && !speakers) activeButton = videoTranscriptButton;
+        else if (timecoded && !speakers) activeButton = videoTimecodedTranscriptButton;
+        else if (!timecoded && speakers) activeButton = videoSpeakerTranscriptButton;
+        else activeButton = videoFullTranscriptButton;
+        
+        // Update UI
+        const buttons = [videoTranscriptButton, videoTimecodedTranscriptButton, videoSpeakerTranscriptButton, videoFullTranscriptButton];
+        buttons.forEach(btn => {
+          btn.disabled = true;
+          btn.classList.add('opacity-50');
+        });
+        
+        activeButton.innerHTML = '<i data-lucide="loader" class="w-4 h-4 mr-2 animate-spin"></i> Feldolgozás...';
+        activeButton.classList.remove('opacity-50');
+        lucide.createIcons();
+        
+        // Show status message
+        const statusMsg = speakers 
+          ? `Beszélőfelismeréses leirat készítése (${outputFormat.toUpperCase()})...` 
+          : `Átiratolás folyamatban (${outputFormat.toUpperCase()})...`;
+        showStatus(statusMsg, 'info');
+        
+        try {
+          // Send transcription request to API
+          const response = await fetch(`${API_URL}/transcribe-video/${videoId}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              timecoded: timecoded,
+              identify_speakers: speakers,
+              output_format: outputFormat,
+              fast_mode: true // Gyors feldolgozási mód engedélyezése a jobb felhasználói élmény érdekében
+            })
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || 'Leirat készítési hiba történt');
+          }
+          
+          const transcriptInfo = await response.json();
+          
+          if (transcriptInfo.status === 'processing') {
+            showStatus(`Leirat készítése folyamatban (${outputFormat.toUpperCase()})...`, 'info');
+            
+            // Poll for status
+            await pollTranscriptionStatus(transcriptInfo.id);
+          } else {
+            showStatus(`${outputFormat.toUpperCase()} leirat elkészült!`, 'success');
+            
+            // Offer download link if available
+            if (transcriptInfo.download_url) {
+              const downloadLink = document.createElement('a');
+              downloadLink.href = transcriptInfo.download_url;
+              downloadLink.download = '';
+              downloadLink.click();
+            }
+          }
+          
+        } catch (error) {
+          console.error('Leirat készítési hiba:', error);
+          showStatus(`Hiba történt a leirat készítése során: ${error.message}`, 'error');
+        } finally {
+          // Reset button states
+          buttons.forEach(btn => {
+            btn.disabled = false;
+            btn.classList.remove('opacity-50');
+          });
+          
+          // Reset button texts
+          videoTranscriptButton.innerHTML = '<i data-lucide="file-text" class="w-4 h-4 mr-2"></i> Egyszerű leirat';
+          videoTimecodedTranscriptButton.innerHTML = '<i data-lucide="timer" class="w-4 h-4 mr-2"></i> Time-kódos leirat';
+          videoSpeakerTranscriptButton.innerHTML = '<i data-lucide="user-round" class="w-4 h-4 mr-2"></i> Beszélőfelismerés';
+          videoFullTranscriptButton.innerHTML = '<i data-lucide="group" class="w-4 h-4 mr-2"></i> Beszélős time-kódos leirat';
+          
+          lucide.createIcons();
+        }
+      }
+      
+      // Polling function for download status
+      async function pollDownloadStatus(videoId) {
+        let isReady = false;
+        let attempts = 0;
+        const maxAttempts = 180; // 15 perc (5s * 180)
+        
+        while (!isReady && attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 5000)); // 5 másodpercenként ellenőrizzük
+          
+          try {
+            const response = await fetch(`${API_URL}/download-status/${videoId}`);
+            if (!response.ok) throw new Error('Status check failed');
+            
+            const statusInfo = await response.json();
+            
+            if (statusInfo.status === 'ready' || statusInfo.status === 'preview_ready') {
+              showStatus('Videó letöltése és feldolgozása kész', 'success');
+              isReady = true;
+              
+              // Auto-play the video
+              const videoResponse = await fetch(`${API_URL}/videos/${videoId}`);
+              if (videoResponse.ok) {
+                const videoInfo = await videoResponse.json();
+                playVideo(videoInfo);
+              }
+            } else if (statusInfo.status === 'error') {
+              showStatus(`Hiba történt a feldolgozás során: ${statusInfo.error_message || 'Ismeretlen hiba'}`, 'error');
+              break;
+            } else {
+              // Update progress status
+              showStatus(`Videó ${statusInfo.status === 'downloading' ? 'letöltése' : 'feldolgozása'} folyamatban... (${attempts+1}/${maxAttempts})`, 'info');
+            }
+            
+            attempts++;
+          } catch (error) {
+            console.error('Error polling download status:', error);
+            break;
+          }
+        }
+        
+        if (attempts >= maxAttempts) {
+          showStatus('Időtúllépés a letöltés ellenőrzésekor. A videó még mindig feldolgozás alatt lehet, próbáld meg később.', 'error');
+        }
+        
+        return isReady;
+      }
+      
+      // Drag and drop functionality
+      const dropZone = document.getElementById('dropZone');
+      const fileInput = document.getElementById('fileInput');
+      const uploadButton = document.getElementById('uploadButton');
+      const statusMessage = document.getElementById('statusMessage');
+      
+      // Prevent default behaviors for drag events
+      ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, preventDefaults, false);
+      });
+      
+      function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      
+      // Highlight/unhighlight drop zone
+      ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, highlight, false);
+      });
+      
+      ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, unhighlight, false);
+      });
+      
+      function highlight() {
+        dropZone.classList.add('highlight');
+      }
+      
+      function unhighlight() {
+        dropZone.classList.remove('highlight');
+      }
+      
+      // File selection via click
+      dropZone.addEventListener('click', () => {
+        fileInput.click();
+      });
+      
+      // File selection via drag & drop
+      dropZone.addEventListener('drop', handleDrop, false);
+      
+      function handleDrop(e) {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        if (files.length) {
+          fileInput.files = files;
+          const file = files[0];
+          updateDropZoneWithFile(file);
+        }
+      }
+      
+      // File selection via input
+      fileInput.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        if (file) {
+          updateDropZoneWithFile(file);
+        }
+      });
+      
+      function updateDropZoneWithFile(file) {
+        dropZone.innerHTML = `
+          <div class="transform transition-transform">
+            <i data-lucide="file-video" class="w-16 h-16 mx-auto text-[var(--video-accent)] mb-4 opacity-80"></i>
+            <p class="text-lg font-medium text-gray-700">${file.name}</p>
+            <p class="text-sm text-gray-500 mt-2">${formatFileSize(file.size)}</p>
+            <button id="changeFileBtn" class="mt-4 px-4 py-2 bg-gray-200 rounded-lg text-gray-700 hover:bg-gray-300 transition">
+              Fájl cseréje
+            </button>
+          </div>
+        `;
+        lucide.createIcons();
+        
+        // Add click handler to change file button
+        document.getElementById('changeFileBtn').addEventListener('click', (e) => {
+          e.stopPropagation(); // Prevent triggering the dropZone click
+          resetDropZone();
+          fileInput.value = '';
+          fileInput.click();
+        });
+      }
+      
+      function resetDropZone() {
+        dropZone.innerHTML = `
+          <div class="transform transition-transform">
+            <i data-lucide="upload-cloud" class="w-16 h-16 mx-auto text-[var(--video-accent)] mb-4 opacity-80"></i>
+            <p class="text-lg font-medium text-gray-700">Húzd ide a videó fájlt vagy kattints a feltöltéshez</p>
+            <p class="text-sm text-gray-500 mt-2">Támogatott formátumok: AVI, MKV, MP4, WebM</p>
+          </div>
+        `;
+        lucide.createIcons();
+      }
+      
+      function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+      }
+      
+      // Format duration
+      function formatDuration(seconds) {
+        if (!seconds) return '--:--';
+        
+        const hrs = Math.floor(seconds / 3600);
+        const mins = Math.floor((seconds % 3600) / 60);
+        const secs = Math.floor(seconds % 60);
+        
+        if (hrs > 0) {
+          return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        } else {
+          return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+      }
+      
+      // File upload
+      uploadButton.addEventListener('click', async () => {
+        if (!fileInput.files || fileInput.files.length === 0) {
+          showStatus('Kérlek válassz ki egy videót feltöltéshez', 'error');
+          return;
+        }
+        
+        const file = fileInput.files[0];
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        showStatus('Feltöltés folyamatban...', 'info');
+        uploadButton.disabled = true;
+        uploadButton.innerHTML = '<i data-lucide="loader" class="w-5 h-5 mr-2 animate-spin"></i> Feltöltés...';
+        lucide.createIcons();
+        
+        try {
+          const response = await fetch(`${API_URL}/upload`, {
+            method: 'POST',
+            body: formData
+          });
+          
+          if (!response.ok) {
+            throw new Error('Upload failed');
+          }
+          
+          const videoInfo = await response.json();
+          
+          if (videoInfo.status === 'processing') {
+            showStatus('Videó feldolgozása folyamatban...', 'info');
+            
+            // Poll for status
+            await pollProcessingStatus(videoInfo.id);
+          } else {
+            showStatus('Feltöltés sikeres', 'success');
+          }
+          
+          // Reset form
+          resetDropZone();
+          fileInput.value = '';
+          
+          // Refresh video list
+          loadVideos();
+          
+        } catch (error) {
+          console.error('Error:', error);
+          showStatus('Hiba történt a feltöltés során', 'error');
+        } finally {
+          uploadButton.disabled = false;
+          uploadButton.innerHTML = '<i data-lucide="upload" class="w-5 h-5 mr-2"></i> Feltöltés';
+          lucide.createIcons();
+        }
+      });
+      
+      // Status message display
+      function showStatus(message, type) {
+        statusMessage.textContent = message;
+        statusMessage.className = `status-message ${type}`;
+        statusMessage.classList.remove('hidden');
+        
+        // Auto hide success/info messages after 5 seconds
+        if (type === 'success' || type === 'info') {
+          setTimeout(() => {
+            statusMessage.classList.add('hidden');
+          }, 5000);
+        }
+      }
+      
+      // Poll for processing status
+      async function pollProcessingStatus(videoId) {
+        let isReady = false;
+        let attempts = 0;
+        const maxAttempts = 120; // Növeljük a maximális próbálkozások számát
+        
+        while (!isReady && attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          try {
+            const response = await fetch(`${API_URL}/videos/${videoId}`);
+            if (!response.ok) throw new Error('Status check failed');
+            
+            const videoInfo = await response.json();
+            
+            if (videoInfo.status === 'ready' || videoInfo.status === 'preview_ready') {
+              showStatus('Videó feldolgozása kész', 'success');
+              isReady = true;
+            } else if (videoInfo.status === 'error') {
+              showStatus('Hiba történt a feldolgozás során', 'error');
+              break;
+            } else {
+              // Frissítsük a státuszt, hogy a felhasználó lássa a feldolgozás folyamatát
+              showStatus(`Videó feldolgozása folyamatban... (${attempts+1}/${maxAttempts})`, 'info');
+            }
+            
+            attempts++;
+          } catch (error) {
+            console.error('Error polling status:', error);
+            break;
+          }
+        }
+        
+        if (attempts >= maxAttempts) {
+          showStatus('Időtúllépés a feldolgozás ellenőrzésekor. A videó még mindig feldolgozás alatt lehet, próbáld meg később.', 'error');
+        }
+        
+        return isReady;
+      }
+      
+      // Load videos
+      async function loadVideos() {
+        try {
+          const response = await fetch(`${API_URL}/videos`);
+          if (!response.ok) throw new Error('Failed to load videos');
+          
+          const data = await response.json();
+          const videos = data.videos || [];
+          
+          const videoListEl = document.getElementById('videoList');
+          const noVideosMsg = document.getElementById('noVideosMessage');
+          
+          if (videos.length === 0) {
+            videoListEl.innerHTML = '';
+            videoListEl.appendChild(noVideosMsg);
+            noVideosMsg.style.display = 'block';
+            return;
+          }
+          
+          noVideosMsg.style.display = 'none';
+          videoListEl.innerHTML = '';
+          
+          videos.forEach(video => {
+            if (video.status === 'ready' || video.status === 'preview_ready') {
+              const videoItem = document.createElement('div');
+              videoItem.className = 'video-item bg-white shadow-md overflow-hidden';
+              videoItem.dataset.id = video.id;
+              
+              const thumbnail = video.thumbnail || '/static/placeholder-video.jpg';
+              const duration = video.duration ? formatDuration(video.duration) : '--:--';
+              
+              // Stream badges
+              let streamBadges = '';
+              if (video.stream_info) {
+                if (video.stream_info.audio_streams > 1) {
+                  streamBadges += `<span class="inline-block bg-blue-500 text-white text-xs px-2 py-1 rounded mr-1">${video.stream_info.audio_streams} Hang</span>`;
+                }
+                if (video.stream_info.subtitle_streams > 0) {
+                  streamBadges += `<span class="inline-block bg-green-500 text-white text-xs px-2 py-1 rounded">${video.stream_info.subtitle_streams} Felirat</span>`;
+                }
+              }
+              
+              // Status badge
+              let statusBadge = '';
+              if (video.status === 'preview_ready') {
+                statusBadge = `<span class="absolute top-2 left-2 bg-blue-500 text-white text-xs px-2 py-1 rounded">Előnézet</span>`;
+              }
+              
+              // Determine if the video is from a download
+              const isDownloaded = video.source_url ? true : false;
+              const downloadBadge = isDownloaded ? 
+                `<span class="absolute top-2 right-2 bg-purple-500 text-white text-xs px-2 py-1 rounded flex items-center">
+                  <i data-lucide="download" class="w-3 h-3 mr-1"></i> Letöltött
+                 </span>` : '';
+              
+              videoItem.innerHTML = `
+                <div class="relative">
+                  <img src="${thumbnail}" alt="${video.filename}" class="thumbnail">
+                  ${statusBadge}
+                  ${downloadBadge}
+                  <span class="absolute bottom-2 right-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
+                    ${duration}
+                  </span>
+                </div>
+                <div class="p-3">
+                  <h3 class="font-medium text-gray-800 line-clamp-1" title="${video.filename}">${video.filename}</h3>
+                  <div class="flex justify-between items-center mt-2">
+                    <span class="inline-block bg-gray-200 text-gray-700 text-xs px-2 py-1 rounded">
+                      ${video.original_format.toUpperCase()}
+                    </span>
+                    <button class="delete-btn text-red-500 hover:text-red-700" data-id="${video.id}">
+                      <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
+                  </div>
+                  ${streamBadges ? `<div class="stream-info-badges mt-2">${streamBadges}</div>` : ''}
+                  ${isDownloaded ? `<div class="text-xs text-gray-500 mt-2 truncate" title="${video.source_url}">Forrás: ${video.source_url}</div>` : ''}
+                </div>
+              `;
+              
+              videoItem.addEventListener('click', (e) => {
+                // Ignore if delete button was clicked
+                if (e.target.closest('.delete-btn')) return;
+                
+                playVideo(video);
+              });
+              
+              videoListEl.appendChild(videoItem);
+            }
+          });
+          
+          // Create icons in the video list
+          lucide.createIcons();
+          
+          // Add delete button event listeners
+          document.querySelectorAll('.delete-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+              e.stopPropagation();
+              const videoId = btn.dataset.id;
+              
+              if (confirm('Biztosan törölni szeretnéd ezt a videót?')) {
+                try {
+                  const response = await fetch(`${API_URL}/videos/${videoId}`, {
+                    method: 'DELETE'
+                  });
+                  
+                  if (!response.ok) throw new Error('Delete failed');
+                  
+                  showStatus('Videó törölve', 'success');
+                  loadVideos();
+                  
+                  // If this was the current video, hide player
+                  if (currentVideo && currentVideo.id === videoId) {
+                    document.getElementById('playerContainer').classList.add('hidden');
+                    currentVideo = null;
+                  }
+                } catch (error) {
+                  console.error('Error deleting video:', error);
+                  showStatus('Hiba történt a törlés során', 'error');
+                }
+              }
+            });
+          });
+          
+        } catch (error) {
+          console.error('Error loading videos:', error);
+          showStatus('Hiba történt a videók betöltésekor', 'error');
+        }
+      }
+      
+      // Play video with media support - Optimalizált verzió
+      async function playVideo(video) {
+        console.log('Playing video:', video);
+        currentVideo = video;
+        
+        const playerContainer = document.getElementById('playerContainer');
+        const videoPlayer = document.getElementById('videoPlayer');
+        const videoTitle = document.getElementById('videoTitle');
+        const videoInfo = document.getElementById('videoInfo');
+        const playButton = document.getElementById('playButton');
+        const controlsPanel = document.querySelector('.media-controls');
+        
+        // Initialize transcript buttons
+        initTranscriptButtons();
+        
+        // Update UI
+        videoTitle.textContent = video.filename;
+        videoInfo.textContent = `Formátum: ${video.original_format.toUpperCase()} ${video.duration ? '• Hossz: ' + formatDuration(video.duration) : ''}`;
+        
+        // Show source URL if available
+        const videoSource = document.getElementById('videoSource');
+        if (video.source_url) {
+          videoSource.textContent = `Forrás: ${video.source_url}`;
+          videoSource.classList.remove('hidden');
+        } else {
+          videoSource.classList.add('hidden');
+        }
+        
+        playerContainer.classList.remove('hidden');
+        playButton.classList.add('hidden');
+        controlsPanel.classList.add('hidden');  // Hide by default
+        
+        // Reset subtitles
+        if (subtitleDisplay) {
+          subtitleDisplay.classList.add('hidden');
+          subtitleDisplay.textContent = '';
+        }
+        
+        // Scroll to player
+        playerContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        
+        try {
+          // Get stream info
+          const response = await fetch(`${API_URL}/stream/${video.id}`);
+          if (!response.ok) throw new Error('Failed to get stream info');
+          
+          const streamInfo = await response.json();
+          console.log('Stream info:', streamInfo);
+          
+          // Determine best source - PRIORITÁS MÓDOSÍTVA 
+          let srcUrl, srcType;
+          
+          // Először ellenőrizze, van-e preview_hls_url
+          if (video.preview_hls_url) {
+            srcUrl = video.preview_hls_url;
+            srcType = 'application/vnd.apple.mpegurl';
+            
+            // Initialize media player with HLS preview for faster start
+            initializeMediaPlayer(videoPlayer, srcUrl, video.id);
+            
+            // Show control panel
+            controlsPanel.classList.remove('hidden');
+          }
+          // Aztán a normál HLS URL
+          else if (streamInfo.hls_url) {
+            srcUrl = streamInfo.hls_url;
+            srcType = 'application/vnd.apple.mpegurl';
+            
+            // Initialize media player with HLS
+            initializeMediaPlayer(videoPlayer, srcUrl, video.id);
+            
+            // Show control panel
+            controlsPanel.classList.remove('hidden');
+          } 
+          else {
+            if (streamInfo.direct_url) {
+              srcUrl = streamInfo.direct_url;
+              srcType = streamInfo.media_type;
+              
+              // Normal playback without media support
+              videoPlayer.src = srcUrl;
+              videoPlayer.type = srcType;
+              videoPlayer.load();
+              
+              // Only show controls when there are audio tracks or subtitles
+              if (streamInfo.stream_info && 
+                  (streamInfo.stream_info.audio_streams > 1 || streamInfo.stream_info.subtitle_streams > 0)) {
+                  
+                // Load media info
+                fetchMediaInfo(video.id).then(mediaInfo => {
+                  if (mediaInfo) {
+                    currentMediaInfo = mediaInfo;
+                    
+                    // Show control panel
+                    controlsPanel.classList.remove('hidden');
+                    
+                    // Populate audio and subtitle tracks
+                    populateAudioTracks(mediaInfo.streams.audio);
+                    populateSubtitleTracks(mediaInfo.streams.subtitle);
+                  }
+                });
+              }
+            }
+          }
+          
+          // Show play button for manual play
+          playButton.classList.remove('hidden');
+          playButton.onclick = function() {
+            videoPlayer.play()
+              .then(() => {
+                console.log('Playback started');
+                playButton.classList.add('hidden');
+              })
+              .catch(err => {
+                console.error('Playback failed:', err);
+                showStatus('Videó lejátszás nem indítható. Próbáld közvetlenül a videó elemre kattintani.', 'error');
+              });
+          };
+          
+          // Allow clicking video to play
+          videoPlayer.onclick = function() {
+            if (videoPlayer.paused) {
+              videoPlayer.play()
+                .then(() => {
+                  playButton.classList.add('hidden');
+                })
+                .catch(err => {
+                  console.error('Playback failed on video click:', err);
+                });
+            } else {
+              videoPlayer.pause();
+            }
+          };
+          
+          if (video.original_format === 'avi' || video.original_format === 'mkv') {
+            showStatus(`${video.original_format.toUpperCase()} feldolgozása történik...`, 'info');
+          }
+          
+        } catch (error) {
+          console.error('Error setting up video playback:', error);
+          showStatus('Hiba történt a lejátszás során: ' + error.message, 'error');
+        }
+      }
+      
+      // Média információk lekérése
+      async function fetchMediaInfo(videoId) {
+        try {
+          const response = await fetch(`${API_URL}/videos/${videoId}/streams`);
+          if (!response.ok) {
+            throw new Error('Media info lekérés sikertelen');
+          }
+          
+          const mediaInfo = await response.json();
+          return mediaInfo;
+        } catch (error) {
+          console.error('Hiba a média információk lekérésekor:', error);
+          return null;
+        }
+      }
+      
+      // HLS lejátszó inicializálása audio és felirat támogatással - Optimalizált verzió
+      function initializeMediaPlayer(videoElement, hlsUrl, video_id) {
+        if (!videoElement) return;
+        
+        // Oldalsó státuszüzenet megjelenítése a betöltési folyamatról
+        showStatus("Videó betöltése és előkészítése, kérjük várjon...", "info");
+        
+        // HLS.js használata ha támogatott
+        if (Hls.isSupported()) {
+          fetchMediaInfo(video_id).then(mediaInfo => {
+            if (!mediaInfo) return;
+            
+            currentMediaInfo = mediaInfo;
+            console.log('Media infó betöltve:', mediaInfo);
+            
+            // Korábbi HLS instance megszüntetése ha létezik
+            if (window.hlsPlayer) {
+              window.hlsPlayer.destroy();
+              window.hlsPlayer = null;
+              console.log("Előző HLS lejátszó leállítva");
+            }
+            
+            // Reset subtitle display
+            if (!subtitleDisplay) {
+              subtitleDisplay = document.createElement('div');
+              subtitleDisplay.className = 'subtitle-text';
+              subtitleDisplay.classList.add('hidden');
+              
+              // Insert after video element
+              videoElement.parentNode.insertBefore(subtitleDisplay, videoElement.nextSibling);
+            } else {
+              subtitleDisplay.classList.add('hidden');
+              subtitleDisplay.textContent = '';
+            }
+            
+            // Láthatóvá tesszük a betöltés indikátort
+            const loadingIndicator = document.createElement('div');
+            loadingIndicator.id = 'video-loading-indicator';
+            loadingIndicator.className = 'absolute inset-0 flex items-center justify-center bg-black bg-opacity-70 z-10';
+            loadingIndicator.innerHTML = `
+              <div class="text-white text-center">
+                <div class="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <div class="text-lg">Videó betöltése...</div>
+                <div class="text-sm text-gray-300 mt-2">Előnézet készítése a gyorsabb lejátszáshoz</div>
+                <div id="loading-progress" class="w-64 h-2 bg-gray-700 rounded-full mt-3">
+                  <div class="h-full bg-blue-500 rounded-full transition-all" style="width: 0%"></div>
+                </div>
+              </div>
+            `;
+            videoElement.parentNode.appendChild(loadingIndicator);
+            
+            // Initialize HLS.js with optimized config
+            const hls = new Hls({
+              debug: false,
+              enableWorker: true,
+              lowLatencyMode: false,
+              backBufferLength: 90,
+              maxBufferSize: 60 * 1000 * 1000, // 60MB
+              maxBufferLength: 30,             // 30 seconds buffer
+              maxMaxBufferLength: 600,         // Max 10 minutes
+              startLevel: -1,                  // Auto quality level at start
+              abrEwmaDefaultEstimate: 1000000, // 1Mbps default bandwidth estimate
+              abrEwmaFastLive: 3.0,           // Fast ABR coefficient
+              abrEwmaSlowLive: 9.0,           // Slow ABR coefficient
+              // Optimized fragment loading settings
+              fragLoadingMaxRetry: 6,          // More retries for fragment loading
+              manifestLoadingMaxRetry: 6,      // More retries for manifest loading
+              levelLoadingMaxRetry: 4,         // More retries for level loading
+              fragLoadingMaxRetryTimeout: 5000, // 5s timeout
+              fragLoadingRetryDelay: 1000,     // 1s retry delay
+              // Better seeking
+              maxFragLookUpTolerance: 0.5      // 0.5s fragment lookup tolerance
+            });
+            
+            // Attach HLS events
+            hls.on(Hls.Events.MEDIA_ATTACHED, function() {
+              console.log('HLS.js media attached');
+            });
+            
+            hls.on(Hls.Events.MANIFEST_PARSED, function(event, data) {
+              console.log('HLS manifest parsed, playback can start');
+              console.log(`${data.levels.length} quality levels available`);
+              
+              // Hide loading indicator
+              const loadingIndicator = document.getElementById('video-loading-indicator');
+              if (loadingIndicator) {
+                loadingIndicator.remove();
+              }
+              
+              // Add audio tracks to selector
+              populateAudioTracks(mediaInfo.streams.audio, hls);
+              
+              // Add subtitles to selector
+              populateSubtitleTracks(mediaInfo.streams.subtitle, hls);
+              
+              // Add quality levels (if any)
+              if (hls.levels && hls.levels.length > 1) {
+                populateQualityLevels(hls);
+              }
+              
+              // Show control panel
+              document.querySelector('.media-controls').classList.remove('hidden');
+              
+              // Update status
+              showStatus("A videó sikeresen betöltve, lejátszás indítható", "success");
+              
+              // Start playback
+              videoElement.play().catch(err => {
+                console.warn('Auto-play error, manual start required', err);
+                document.getElementById('playButton').classList.remove('hidden');
+              });
+            });
+            
+            // Add loading progress tracking
+            hls.on(Hls.Events.FRAG_LOADING_PROGRESS, function(event, data) {
+              const loadingProgress = document.querySelector('#loading-progress div');
+              if (loadingProgress && data.total > 0) {
+                const percent = Math.min(100, Math.round((data.loaded / data.total) * 100));
+                loadingProgress.style.width = percent + '%';
+              }
+            });
+            
+            // Add error handling
+            hls.on(Hls.Events.ERROR, function(event, data) {
+              console.error('HLS error:', data.type, data.details);
+              
+              if (data.fatal) {
+                switch(data.type) {
+                  case Hls.ErrorTypes.NETWORK_ERROR:
+                    showStatus("Hálózati hiba történt a betöltés során. Újrapróbálkozás...", "error");
+                    hls.startLoad();
+                    break;
+                  case Hls.ErrorTypes.MEDIA_ERROR:
+                    showStatus("Média hiba történt. Helyreállítási kísérlet...", "error");
+                    hls.recoverMediaError();
+                    break;
+                  default:
+                    showStatus("Végzetes hiba történt a lejátszás során: " + data.details, "error");
+                    break;
+                }
+              }
+            });
+            
+            // Enhanced FRAG_LOADED handling for large files
+            hls.on(Hls.Events.FRAG_LOADED, function(event, data) {
+              // Update fragment loading progress in case of large files
+              console.log(`Szegmens betöltve: ${data.frag.sn}`);
+            });
+            
+            // Check for video preview vs full quality
+            // If url contains 'preview', we'll later check for full quality
+            const isPreview = hlsUrl.includes('preview');
+            
+            // Load source after all event handlers are attached
+            hls.loadSource(hlsUrl);
+            hls.attachMedia(videoElement);
+            
+            // Store global reference
+            window.hlsPlayer = hls;
+            
+            // If this is a preview version, periodically check for full version
+            if (isPreview) {
+              console.log("Ez egy előnézeti verzió, ellenőrizzük a teljes verzió elérhetőségét");
+              
+              // Értesítés a felhasználónak, hogy csak az előnézet töltődött be
+              const fullVersionMsg = document.createElement('div');
+              fullVersionMsg.className = 'quality-shift-notification';
+              fullVersionMsg.style.animation = 'none';
+              fullVersionMsg.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+              fullVersionMsg.style.opacity = '1';
+              fullVersionMsg.style.left = '10px';
+              fullVersionMsg.style.top = '10px';
+              fullVersionMsg.textContent = 'Előnézeti verzió (3 perc) betöltve. Teljes verzió feldolgozása folyamatban...';
+              document.querySelector('.video-container').appendChild(fullVersionMsg);
+              
+              // Indítsuk el a teljes verzió ellenőrzését
+              startCheckingForFullQuality(video_id, fullVersionMsg);
+            }
+            
+            // Watch for subtitle track events
+            if (mediaInfo.streams.subtitle && mediaInfo.streams.subtitle.length > 0) {
+              videoElement.textTracks.addEventListener('addtrack', (event) => {
+                setupSubtitleEvents(event.track);
+              });
+            }
+          });
+        } 
+        // Fallback to native HLS support or direct playback
+        else {
+          fetchMediaInfo(video_id).then(mediaInfo => {
+            if (!mediaInfo) return;
+            
+            currentMediaInfo = mediaInfo;
+            
+            // Native audio and subtitle handling
+            videoElement.src = hlsUrl;
+            videoElement.addEventListener('loadedmetadata', () => {
+              console.log('Video metadata loaded');
+              
+              // Add audio tracks
+              if (videoElement.audioTracks) {
+                populateNativeAudioTracks(videoElement.audioTracks);
+              }
+              
+              // Add subtitle tracks
+              if (videoElement.textTracks) {
+                populateNativeSubtitleTracks(videoElement.textTracks);
+              }
+              
+              // Start playback
+              videoElement.play().catch(err => {
+                console.warn('Auto-play error, manual start required', err);
+              });
+            });
+          });
+        }
+      }
+      
+      // Függvény a jobb minőségű verzióra váltáshoz
+      function startCheckingForFullQuality(videoId, statusElement) {
+        let checkCount = 0;
+        const maxChecks = 120; // Maximum 10 perc (5s * 120 = 600s)
+        
+        const checkInterval = setInterval(async () => {
+          try {
+            checkCount++;
+            
+            // Get latest video info
+            const response = await fetch(`/api/videos/${videoId}`);
+            if (!response.ok) {
+              console.warn("Hiba a videó információk lekérésekor");
+              return;
+            }
+            
+            const videoInfo = await response.json();
+            
+            // Frissítsük az állapotjelzőt minden ellenőrzésnél
+            if (statusElement) {
+              // Az ellenőrzés számát százalék formátumban megjeleníteni
+              const progressPercent = Math.min(99, Math.round((checkCount / maxChecks) * 100));
+              statusElement.textContent = `Előnézeti verzió (3 perc) betöltve. Teljes verzió feldolgozása folyamatban... ${progressPercent}%`;
+            }
+            
+            // Check if full version is available
+            if (videoInfo.status === "ready" && videoInfo.hls_url && !videoInfo.hls_url.includes("preview")) {
+              console.log("A teljes verzió elérhető, váltás jobb minőségre");
+              clearInterval(checkInterval);
+              
+              // Show notification to user
+              showStatus("A teljes verzió elkészült. Váltás jobb minőségre...", "success");
+              
+              // Get current playback position
+              const currentTime = document.getElementById("videoPlayer").currentTime;
+              
+              // Update status message
+              if (statusElement) {
+                statusElement.textContent = 'A teljes videó betöltése befejeződött! Váltás jobb minőségre...';
+                statusElement.style.backgroundColor = 'rgba(34, 197, 94, 0.8)'; // Zöld háttér
+                
+                // 3 másodperc múlva eltüntetjük a teljes verzió értesítőt
+                setTimeout(() => {
+                  statusElement.style.animation = 'fadeOut 2s forwards';
+                }, 3000);
+              }
+              
+              // Show quality shift notification in player
+              const notification = document.createElement('div');
+              notification.className = 'quality-shift-notification';
+              notification.textContent = 'Váltás jobb minőségre...';
+              document.querySelector('.video-container').appendChild(notification);
+              
+              // Switch to better quality
+              initializeMediaPlayer(document.getElementById("videoPlayer"), videoInfo.hls_url, videoId);
+              
+              // Set up listener to restore playback position after switching
+              document.getElementById("videoPlayer").addEventListener("loadedmetadata", function onceLoaded() {
+                // Restore playback position
+                document.getElementById("videoPlayer").currentTime = currentTime;
+                document.getElementById("videoPlayer").removeEventListener("loadedmetadata", onceLoaded);
+              });
+            }
+            
+            // Stop checking after max attempts
+            if (checkCount >= maxChecks) {
+              console.log("Elérte a maximális ellenőrzések számát, leállás");
+              clearInterval(checkInterval);
+              
+              // Frissítsük az állapotjelzőt a timeout eseményre
+              if (statusElement) {
+                statusElement.textContent = 'A teljes verzió feldolgozása túl sokáig tart. Előnézet továbbra is elérhető.';
+                statusElement.style.backgroundColor = 'rgba(234, 88, 12, 0.8)'; // Narancssárga figyelmeztetés
+              }
+            }
+          } catch (error) {
+            console.error("Hiba a teljes minőség ellenőrzésekor:", error);
+          }
+        }, 5000); // Check every 5 seconds
+      }
+      
+      // Audio sávok feltöltése a választóba
+      function populateAudioTracks(audioStreams, hls) {
+        if (!audioStreams || audioStreams.length === 0) return;
+        
+        const audioSelect = document.getElementById('audioTrackSelect');
+        audioSelect.innerHTML = '';
+        
+        audioStreams.forEach((track, index) => {
+          const option = document.createElement('option');
+          option.value = index;
+          option.textContent = formatAudioTrackName(track);
+          audioSelect.appendChild(option);
+        });
+        
+        // Eseménykezelő a változásokhoz
+        audioSelect.addEventListener('change', function() {
+          const trackIndex = parseInt(this.value);
+          setHLSAudioTrack(trackIndex, hls);
+        });
+      }
+      
+      // Felirat sávok feltöltése a választóba
+      function populateSubtitleTracks(subtitleStreams, hls) {
+        if (!subtitleStreams || subtitleStreams.length === 0) return;
+        
+        const subtitleSelect = document.getElementById('subtitleTrackSelect');
+        // Megtartjuk az "Off" opciót
+        subtitleSelect.innerHTML = '<option value="off">Felirat kikapcsolva</option>';
+        
+        subtitleStreams.forEach((track, index) => {
+          const option = document.createElement('option');
+          option.value = index;
+          option.textContent = formatSubtitleTrackName(track);
+          subtitleSelect.appendChild(option);
+        });
+        
+        // Eseménykezelő a változásokhoz
+        subtitleSelect.addEventListener('change', function() {
+          const value = this.value;
+          if (value === 'off') {
+            disableSubtitles();
+          } else {
+            const trackIndex = parseInt(value);
+            setSubtitleTrack(trackIndex);
+          }
+        });
+      }
+      
+      // Minőségi szintek feltöltése a választóhoz - Optimalizált verzió
+      function populateQualityLevels(hls) {
+        const qualitySelect = document.getElementById('qualitySelect');
+        // Megtartjuk az "Auto" opciót
+        qualitySelect.innerHTML = '<option value="auto">Automatikus minőség</option>';
+        
+        // Minőségi szintek hozzáadása (legnagyobb felbontástól a legkisebb felé)
+        const levels = hls.levels.slice().reverse();
+        
+        levels.forEach((level, index) => {
+          const width = level.width;
+          const height = level.height;
+          const bitrate = Math.round(level.bitrate / 1000);
+          
+          let qualityLabel = '';
+          if (height >= 1080) {
+            qualityLabel = 'Full HD';
+          } else if (height >= 720) {
+            qualityLabel = 'HD';
+          } else if (height >= 480) {
+            qualityLabel = 'SD';
+          } else {
+            qualityLabel = 'Alacsony';
+          }
+          
+          const option = document.createElement('option');
+          option.value = hls.levels.length - 1 - index; // Eredeti index
+          option.textContent = `${qualityLabel} (${width}x${height}, ${bitrate}kbps)`;
+          qualitySelect.appendChild(option);
+        });
+        
+        // Eseménykezelő a változásokhoz
+        qualitySelect.addEventListener('change', function() {
+          const value = this.value;
+          setQualityLevel(value, hls);
+        });
+        
+        // Automatikusan válasszuk az ajánlott minőséget a hálózati sebesség alapján
+        selectOptimalQuality(hls);
+      }
+      
+      // Hálózati sebesség alapján optimális minőség választása
+      function selectOptimalQuality(hls) {
+        // Get available bandwidth (if any)
+        const bandwidth = hls.bandwidthEstimate;
+        
+        if (!bandwidth || bandwidth <= 0) {
+          // If bandwidth is unknown, start with auto
+          return;
+        }
+        
+        // Find appropriate quality level based on bandwidth
+        // Bandwidth is in bytes/s, convert to bits/s by multiplying by 8
+        const bandwidthBits = bandwidth * 8;
+        
+        // Find the highest quality level that is less than 80% of available bandwidth
+        let optimalLevel = 0;
+        for (let i = 0; i < hls.levels.length; i++) {
+          if (hls.levels[i].bitrate < bandwidthBits * 0.8) {
+            optimalLevel = i;
+          } else {
+            break;
+          }
+        }
+        
+        // Set the quality level in UI
+        const qualitySelect = document.getElementById('qualitySelect');
+        qualitySelect.value = optimalLevel;
+        
+        // Set the actual quality level
+        setQualityLevel(optimalLevel, hls);
+        
+        console.log(`Optimális minőségi szint kiválasztva: ${optimalLevel} (sávszélesség: ${Math.round(bandwidthBits/1000)}kbps)`);
+      }
+      
+      // HLS audio sáv beállítása
+      function setHLSAudioTrack(trackIndex, hls) {
+        currentAudioTrack = trackIndex;
+        
+        // HLSjs használata, ha audio sáv változtatását támogatja
+        if (hls && typeof hls.audioTrack !== 'undefined') {
+          console.log(`HLS audio sáv beállítása: ${trackIndex}`);
+          hls.audioTrack = trackIndex;
+        } else if (window.hlsPlayer && typeof window.hlsPlayer.audioTrack !== 'undefined') {
+          // Globális HLS példány használata, ha van
+          console.log(`Globális HLS audio sáv beállítása: ${trackIndex}`);
+          window.hlsPlayer.audioTrack = trackIndex;
+        } else {
+          console.warn("HLS audio track váltás nem támogatott");
+          // Próbáljuk a natív módszert
+          setNativeAudioTrack(trackIndex);
+        }
+        
+        console.log(`Audio sáv beállítva: ${trackIndex}`);
+      }
+      
+      // Felirat beállítása
+      function setSubtitleTrack(trackIndex) {
+        currentSubtitleTrack = trackIndex;
+        
+        // Felirat megjelenítésének beállítása
+        if (subtitleDisplay) {
+          subtitleDisplay.classList.remove('hidden');
+        }
+        
+        console.log(`Felirat sáv beállítva: ${trackIndex}`);
+        
+        // Felirat betöltése és megjelenítésének beállítása
+        if (currentMediaInfo && currentMediaInfo.streams && 
+            currentMediaInfo.streams.subtitle && 
+            currentMediaInfo.streams.subtitle[trackIndex]) {
+            
+            const videoId = currentVideo ? currentVideo.id : null;
+            if (!videoId) {
+                console.error("Nem található video ID a felirathoz");
+                return;
+            }
+            
+            const subtitleInfo = currentMediaInfo.streams.subtitle[trackIndex];
+            console.log(`Felirat betöltése: ${subtitleInfo.title} (index: ${subtitleInfo.index})`);
+            
+            // Javított felirat betöltés
+            loadSubtitleForTrack(videoId, subtitleInfo.index);
+        } else {
+            console.warn("Nem található felirat információ", currentMediaInfo);
+        }
+      }
+      
+      // Natív audio sáv beállítása
+      function setNativeAudioTrack(trackIndex) {
+        const videoElement = document.getElementById('videoPlayer');
+        if (!videoElement || !videoElement.audioTracks) return;
+        
+        for (let i = 0; i < videoElement.audioTracks.length; i++) {
+            videoElement.audioTracks[i].enabled = (i === trackIndex);
+        }
+        
+        currentAudioTrack = trackIndex;
+        console.log(`Natív audio sáv beállítva: ${trackIndex}`);
+      }
+      
+      // Feliratok kikapcsolása
+      function disableSubtitles() {
+        currentSubtitleTrack = null;
+        
+        if (subtitleDisplay) {
+            subtitleDisplay.classList.add('hidden');
+        }
+        
+        console.log('Feliratok kikapcsolva');
+      }
+      
+      // Felirat betöltése a kiválasztott sávhoz
+      async function loadSubtitleForTrack(videoId, trackIndex) {
+        try {
+            const subtitleUrl = `/hls/${videoId}/subtitle_${trackIndex}/subtitles.vtt`;
+            console.log(`Felirat betöltése: ${subtitleUrl}`);
+            
+            // WebVTT parser használata
+            const response = await fetch(subtitleUrl);
+            if (!response.ok) {
+                throw new Error(`Felirat nem található: ${subtitleUrl} (${response.status})`);
+            }
+            
+            const subtitleText = await response.text();
+            console.log(`Felirat betöltve (${subtitleText.length} karakter)`);
+            parseVTTandSetupEvents(subtitleText);
+        } catch (error) {
+            console.error('Hiba a felirat betöltésekor:', error);
+        }
+      }
+      
+      // VTT felirat értelmezése és események beállítása
+      function parseVTTandSetupEvents(vttContent) {
+        console.log("Felirat feldolgozása:", vttContent.slice(0, 100) + "...");
+        
+        // Egyszerű VTT parser
+        const lines = vttContent.split('\n');
+        const cues = [];
+        let currentCue = null;
+        let collectingCueText = false;
+        
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            
+            // WebVTT fejléc kihagyása
+            if (line === 'WEBVTT' || line === '') continue;
+            
+            // Időzítési információ (pl. 00:00:01.000 --> 00:00:04.000)
+            const timingRegex = /(\d+):(\d+):(\d+)\.(\d+)\s*-->\s*(\d+):(\d+):(\d+)\.(\d+)/;
+            const match = line.match(timingRegex);
+            
+            if (match) {
+                // Ha már van aktuális cue, adjuk hozzá a listához
+                if (currentCue) {
+                    cues.push(currentCue);
+                }
+                
+                // Új cue időzítés létrehozása
+                const startTime = parseInt(match[1]) * 3600 + parseInt(match[2]) * 60 + parseInt(match[3]) + parseInt(match[4]) / 1000;
+                const endTime = parseInt(match[5]) * 3600 + parseInt(match[6]) * 60 + parseInt(match[7]) + parseInt(match[8]) / 1000;
+                
+                currentCue = {
+                    startTime,
+                    endTime,
+                    text: ''
+                };
+                
+                collectingCueText = true;
+            } 
+            // Cue text gyűjtése
+            else if (collectingCueText && currentCue && line !== '') {
+                currentCue.text += (currentCue.text ? '\n' : '') + line;
+            }
+        }
+        
+        // Utolsó cue hozzáadása
+        if (currentCue) {
+            cues.push(currentCue);
+        }
+        
+        console.log(`${cues.length} felirat időzítés betöltve`);
+        
+        // Események beállítása a cue-khoz
+        setupSubtitleEvents(cues);
+      }
+      
+      // Felirat események beállítása
+      function setupSubtitleEvents(cues) {
+        // Check if cues is an array
+        if (!Array.isArray(cues)) {
+            console.error("A cues paraméter nem tömb:", cues);
+            return;
+        }
+        
+        console.log(`Felirat események beállítása ${cues.length} felirathoz`);
+        
+        // Helyesebb megközelítés: video timeupdate esemény figyelése
+        const videoElement = document.getElementById('videoPlayer');
+        if (!videoElement) {
+            console.error("Nem található videó elem a feliratokhoz");
+            return;
+        }
+        
+        // Frissített timeupdate eseménykezelő
+        videoElement.ontimeupdate = function() {
+            const currentTime = videoElement.currentTime;
+            let foundCue = false;
+            
+            // Aktuális időhöz tartozó felirat keresése
+            for (let i = 0; i < cues.length; i++) {
+                const cue = cues[i];
+                if (currentTime >= cue.startTime && currentTime <= cue.endTime) {
+                    if (subtitleDisplay) {
+                        subtitleDisplay.textContent = cue.text;
+                        subtitleDisplay.classList.remove('hidden');
+                    }
+                    foundCue = true;
+                    break;
+                }
+            }
+            
+            // Ha nincs felirat az aktuális időben
+            if (!foundCue && subtitleDisplay) {
+                subtitleDisplay.classList.add('hidden');
+            }
+        };
+        
+        console.log("Felirat események beállítva");
+      }
+      
+      // Minőség beállítása
+      function setQualityLevel(levelValue, hls) {
+        currentQualityLevel = levelValue;
+        
+        if (hls) {
+            if (levelValue === 'auto') {
+                hls.currentLevel = -1; // Automatikus
+            } else {
+                hls.currentLevel = parseInt(levelValue);
+            }
+            
+            console.log(`Minőség beállítva: ${levelValue === 'auto' ? 'Automatikus' : levelValue}`);
+        }
+      }
+      
+      // Audio sáv nevének formázása
+      function formatAudioTrackName(track) {
+        let name = track.title || `Audio ${track.index + 1}`;
+        
+        // Nyelv hozzáadása, ha elérhető
+        if (track.language && track.language !== 'und') {
+            name += ` (${track.language.toUpperCase()})`;
+        }
+        
+        // Csatornaszám hozzáadása
+        if (track.channels) {
+            if (track.channels === 1) {
+                name += ' [Mono]';
+            } else if (track.channels === 2) {
+                name += ' [Stereo]';
+            } else if (track.channels === 6) {
+                name += ' [5.1]';
+            } else if (track.channels === 8) {
+                name += ' [7.1]';
+            } else {
+                name += ` [${track.channels}ch]`;
+            }
+        }
+        
+        return name;
+      }
+      
+      // Felirat sáv nevének formázása
+      function formatSubtitleTrackName(track) {
+        let name = track.title || `Felirat ${track.index + 1}`;
+        
+        // Nyelv hozzáadása, ha elérhető
+        if (track.language && track.language !== 'und') {
+            name += ` (${track.language.toUpperCase()})`;
+        }
+        
+        return name;
+      }
+      
+      // Initial load
+      loadVideos();
+    });
+  </script>
+</body>
+</html>

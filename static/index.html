@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MosaicMaster | AI Document Translator, Converter & Transcriber</title>
+
+  <!-- SEO Meta Tags -->
+  <meta name="description" content="MosaicMaster is an AI-powered platform offering advanced document translation, conversion, transcription and video downloading services. Download and convert videos from YouTube, Twitter (X), TikTok, Facebook, Instagram, Twitch, Vimeo and more. Process documents and images in multiple formats including PDF, DOCX, DOC, ODT, PPT, PPTX, TXT, RTF, EPUB, SRT, MOBI, SUB, JPG, JPEG, PNG, and GIF." />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://www.yourdomain.com/" />
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="MosaicMaster | AI Document Translator, Converter & Transcriber" />
+  <meta property="og:description" content="Experience premium AI-powered document translation, conversion, transcription and video downloading services with MosaicMaster." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://www.yourdomain.com/" />
+  <meta property="og:image" content="https://www.yourdomain.com/og-image.jpg" />
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Swiper CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/swiper/swiper-bundle.min.css" />
+
+  <!-- Polyfill for crypto.randomUUID (older browsers) -->
+  <script>
+    if (!crypto.randomUUID) {
+      crypto.randomUUID = function() {
+        return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
+          (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+        );
+      }
+    }
+  </script>
+
+  <style>
+    :root {
+      --primary-color: #0D1B2A;
+      --secondary-color: #D4AF37;
+      --accent-color: #A4161A;
+      --transcribe-accent: #9333ea;
+      --animation-duration: 0.3s;
+      --video-accent: #2563eb;
+      --stream-accent: #ef4444;
+    }
+    /* Global mosaic background */
+    .background-image {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: url('/static/ravenna.jpg') no-repeat center center;
+      background-size: cover;
+      opacity: 0.2;
+      z-index: -2;
+    }
+    header {
+      padding: 0.3rem 0;
+      position: relative;
+      background-color: var(--primary-color);
+    }
+    header::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+      height: 100%;
+      background: url('/static/ravenna.jpg') no-repeat center center;
+      background-size: cover;
+      opacity: 0.1;
+      z-index: -1;
+    }
+    #try::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%;
+      height: 100%;
+      background: url('/static/theodora.jpg') no-repeat center center;
+      background-size: cover;
+      opacity: 0.25;
+      z-index: -1;
+    }
+    /* Drop-zone styling */
+    .drop-zone {
+      border: 2px dashed #ccc;
+      border-radius: 8px;
+      padding: 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    .drop-zone.dragover {
+      background-color: #f0f0f0;
+    }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+  <!-- Global background mosaic -->
+  <div class="background-image"></div>
+
+  <!-- Header -->
+  <header class="text-white">
+    <div class="container mx-auto px-6 flex justify-between items-center">
+      <div class="text-2xl font-bold">MosaicMaster</div>
+      <nav>
+        <ul class="flex space-x-6">
+          <li><a href="#home" class="hover:text-[var(--secondary-color)]">Home</a></li>
+          <li><a href="#features" class="hover:text-[var(--secondary-color)]">Features</a></li>
+          <li><a href="#try" class="hover:text-[var(--secondary-color)]">Try It Now</a></li>
+          <li><a href="/textreader.html" class="hover:text-[var(--secondary-color)]">Text Reader</a></li>
+          <li><a href="/video-player.html" class="hover:text-[var(--secondary-color)]">Video Player</a></li>
+          <li><a href="/live-streams.html" class="hover:text-[var(--secondary-color)]">Live Streams</a></li>
+          <li><a href="#pricing" class="hover:text-[var(--secondary-color)]">Pricing</a></li>
+          <li><a href="#contact" class="hover:text-[var(--secondary-color)]">Contact</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section id="home" class="bg-[var(--primary-color)] text-white py-16">
+    <div class="container mx-auto px-6 text-center">
+      <h1 class="text-4xl md:text-6xl font-extrabold mb-4">Welcome to MosaicMaster</h1>
+      <p class="text-lg md:text-2xl mb-8">
+        AI-powered document translation, conversion, transcription and video downloading in one premium platform.
+      </p>
+      <div class="flex flex-wrap justify-center gap-4">
+        <a href="#pricing"
+           class="bg-[var(--secondary-color)] text-[var(--primary-color)] px-8 py-4 rounded-full font-bold hover:bg-yellow-400 transition">
+          Get Started Now!
+        </a>
+        <a href="/textreader.html"
+           class="bg-[var(--transcribe-accent)] text-white px-8 py-4 rounded-full font-bold hover:bg-purple-600 transition flex items-center">
+          <i data-lucide="volume-2" class="mr-2 h-5 w-5"></i> Text Reader
+        </a>
+        <a href="/video-player.html"
+           class="bg-[var(--video-accent)] text-white px-8 py-4 rounded-full font-bold hover:bg-blue-600 transition flex items-center">
+          <i data-lucide="play" class="mr-2 h-5 w-5"></i> Video Player
+        </a>
+        <a href="/live-streams.html"
+           class="bg-[var(--accent-color)] text-white px-8 py-4 rounded-full font-bold hover:bg-red-700 transition flex items-center">
+          <i data-lucide="radio" class="mr-2 h-5 w-5"></i> Live Streams
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Key Features Section (Swiper) -->
+  <section id="features" class="py-16">
+    <div class="container mx-auto px-6">
+      <h2 class="text-3xl font-bold text-center mb-8">Key Features</h2>
+      <div class="swiper features-swiper">
+        <div class="swiper-wrapper">
+          <!-- Slide 1 -->
+          <div class="swiper-slide">
+            <div class="bg-[#F5F5DC] p-6 rounded-lg shadow">
+              <i data-lucide="video" class="w-12 h-12 text-[var(--primary-color)] mb-4"></i>
+              <h3 class="text-xl font-semibold mb-2">Video Download, Convert and Transcript</h3>
+              <p>
+                Download videos from YouTube, Twitter (X), TikTok, Facebook, Instagram, Twitch, Vimeo and more.
+                Convert to MP4, extract MP3 and generate subtitles.
+              </p>
+            </div>
+          </div>
+          <!-- Slide 2 -->
+          <div class="swiper-slide">
+            <div class="bg-[#F5F5DC] p-6 rounded-lg shadow">
+              <i data-lucide="mic" class="w-12 h-12 text-[var(--primary-color)] mb-4"></i>
+              <h3 class="text-xl font-semibold mb-2">Transcription and Live Translation</h3>
+              <p>
+                Transcribe your audio (MP3, WAV, OGG, M4A) with Whisper AI – choose live transcription,
+                live translation or file-based processing.
+              </p>
+            </div>
+          </div>
+          <!-- Slide 3 -->
+          <div class="swiper-slide">
+            <div class="bg-[#F5F5DC] p-6 rounded-lg shadow">
+              <i data-lucide="globe" class="w-12 h-12 text-[var(--primary-color)] mb-4"></i>
+              <h3 class="text-xl font-semibold mb-2">Translation</h3>
+              <p>
+                Translate your documents into 98+ languages with our advanced AI.
+                (Formats: PDF, DOCX, DOC, ODT, PPT, PPTX, TXT, RTF, EPUB, SRT, MOBI, SUB)
+              </p>
+            </div>
+          </div>
+          <!-- Slide 4 -->
+          <div class="swiper-slide">
+            <div class="bg-[#F5F5DC] p-6 rounded-lg shadow">
+              <i data-lucide="file-text" class="w-12 h-12 text-[var(--primary-color)] mb-4"></i>
+              <h3 class="text-xl font-semibold mb-2">Conversion & Picture Reading</h3>
+              <p>
+                Convert your files or extract text from images into various formats.
+                (Supported: PDF, DOCX, DOC, ODT, TXT, RTF, PPT, PPTX, EPUB, SRT, MOBI, SUB, JPG, JPEG, PNG, GIF)
+              </p>
+            </div>
+          </div>
+          <!-- Slide 5 - Video Player -->
+          <div class="swiper-slide">
+            <div class="bg-[#F5F5DC] p-6 rounded-lg shadow">
+              <i data-lucide="play" class="w-12 h-12 text-[var(--primary-color)] mb-4"></i>
+              <h3 class="text-xl font-semibold mb-2">Advanced Video Player</h3>
+              <p>
+                GPU-accelerated player for AVI, MKV, MP4, WebM formats with support for multiple audio tracks 
+                and subtitle streams. Upload your videos for enhanced browsing and playback.
+              </p>
+            </div>
+          </div>
+          <!-- Slide 6 - Live Streams -->
+          <div class="swiper-slide">
+            <div class="bg-[#F5F5DC] p-6 rounded-lg shadow">
+              <i data-lucide="radio" class="w-12 h-12 text-[var(--primary-color)] mb-4"></i>
+              <h3 class="text-xl font-semibold mb-2">Live Stream Management</h3>
+              <p>
+                Watch and record YouTube, Twitch, and Facebook live streams in one place. 
+                Proxy mode for better performance, automatic cataloging of recorded streams.
+              </p>
+            </div>
+          </div>
+        </div>
+        <div class="swiper-pagination"></div>
+      </div>
+      <div class="mt-8 text-center">
+        <p class="text-gray-700">
+          MosaicMaster combines advanced AI-powered document services into one seamless platform –
+          from translation and conversion to transcription and video processing.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Try It Now Section -->
+  <section id="try" class="relative py-16">
+    <div class="absolute inset-0"
+         style="background: url('/static/theodora.jpg') no-repeat center center; background-size: cover; opacity: 0.25; z-index: -1;">
+    </div>
+    <div class="container mx-auto px-6">
+      <h2 class="text-3xl font-bold text-center mb-8">Try It Now</h2>
+      <div id="functionalWidget" class="bg-white bg-opacity-80 p-6 rounded-lg shadow-lg">
+        <!-- Mode Switch Buttons -->
+        <div class="flex justify-center gap-4 mb-6">
+          <button id="translatorModeBtnFunc"
+                  class="mode-switch active px-6 py-3 rounded-xl bg-blue-500 text-white font-medium flex items-center gap-2">
+            <i data-lucide="languages" class="w-5 h-5"></i> Translator and Transformator
+          </button>
+          <button id="videoModeBtnFunc"
+                  class="mode-switch px-6 py-3 rounded-xl bg-gray-200 text-gray-600 font-medium flex items-center gap-2">
+            <i data-lucide="video" class="w-5 h-5"></i> Video Download, Convert and Transcript
+          </button>
+          <button id="transcribeModeBtnFunc"
+                  class="mode-switch px-6 py-3 rounded-xl bg-gray-200 text-gray-600 font-medium flex items-center gap-2">
+            <i data-lucide="mic" class="w-5 h-5"></i> Transcribe and Live Translation
+          </button>
+          <button id="converterModeBtnFunc"
+                  class="mode-switch px-6 py-3 rounded-xl bg-gray-200 text-gray-600 font-medium flex items-center gap-2">
+            <i data-lucide="file-type" class="w-5 h-5"></i> Converter and Picture Reader
+          </button>
+        </div>
+        <!-- Main Functional Area -->
+        <div id="functionalMain" class="mb-6">
+          <div id="functionalDropZone" class="drop-zone rounded-xl p-8 text-center cursor-pointer">
+            <!-- Content loaded dynamically based on mode -->
+          </div>
+
+          <!-- Video Mode: Source Options -->
+          <div id="videoSourceOptions" class="mb-4 hidden">
+            <label class="block text-sm font-medium text-gray-700">Select Video Source</label>
+            <div class="flex gap-4 mt-2">
+              <label class="inline-flex items-center">
+                <input type="radio" name="videoSource" value="url" checked class="form-radio" id="videoSourceURL">
+                <span class="ml-2">From URL</span>
+              </label>
+              <label class="inline-flex items-center">
+                <input type="radio" name="videoSource" value="local" class="form-radio" id="videoSourceLocal">
+                <span class="ml-2">Local File Upload</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Video Options Section -->
+          <div id="videoOptions" class="hidden">
+            <div id="urlOptions">
+              <label class="block text-sm font-medium text-gray-700 mb-2">Video URL</label>
+              <input type="text" id="videoURLInput" class="w-full p-3 border rounded focus:ring-blue-500"
+                     placeholder="Enter video URL">
+            </div>
+            <label class="block text-sm font-medium text-gray-700 mt-4 mb-2">Select Platform</label>
+            <select id="videoPlatform" class="w-full p-3 border rounded focus:ring-blue-500 mb-2">
+              <option value="youtube">YouTube</option>
+              <option value="twitter">Twitter (X)</option>
+              <option value="tiktok">TikTok</option>
+              <option value="facebook">Facebook</option>
+              <option value="instagram">Instagram</option>
+              <option value="twitch">Twitch</option>
+              <option value="vimeo">Vimeo</option>
+              <option value="other">Other</option>
+            </select>
+            <div class="mt-2">
+              <label class="inline-flex items-center">
+                <input type="checkbox" id="videoConvertMP3" class="form-checkbox">
+                <span class="ml-2">Convert to MP3</span>
+              </label>
+            </div>
+            <div class="mt-2">
+              <label class="inline-flex items-center">
+                <input type="checkbox" id="videoGenerateSubtitles" class="form-checkbox">
+                <span class="ml-2">Generate Subtitles</span>
+              </label>
+            </div>
+            <div id="videoSubtitleFormatSection" class="mt-2 hidden">
+              <label class="block text-sm font-medium text-gray-700">Subtitle Format</label>
+              <select id="videoSubtitleFormat" class="w-full p-3 border rounded focus:ring-blue-500">
+                <option value="srt">SRT</option>
+                <option value="vtt">VTT</option>
+              </select>
+            </div>
+            <div class="mt-4 border-t pt-4">
+              <label class="block text-sm font-medium text-gray-700 mb-2">Local Video Conversion Options</label>
+              <div class="mb-2">
+                <label class="block text-sm text-gray-600">Target Format</label>
+                <select id="targetVideoFormat" class="w-full p-3 border rounded focus:ring-blue-500">
+                  <option value="">Default (Keep original)</option>
+                  <option value="mp4">MP4</option>
+                  <option value="webm">WebM</option>
+                  <option value="mkv">MKV</option>
+                  <option value="avi">AVI</option>
+                  <option value="mov">MOV</option>
+                  <option value="flv">FLV</option>
+                  <option value="3gp">3GP</option>
+                  <option value="wmv">WMV</option>
+                </select>
+              </div>
+              <div class="mb-2">
+                <label class="block text-sm text-gray-600">Resolution</label>
+                <select id="videoResolution" class="w-full p-3 border rounded focus:ring-blue-500">
+                  <option value="">Keep Original</option>
+                  <option value="4k">4K</option>
+                  <option value="1080p">1080p</option>
+                  <option value="720p">720p</option>
+                  <option value="480p">480p</option>
+                </select>
+              </div>
+              <div class="mb-2">
+                <label class="block text-sm text-gray-600">Video Quality</label>
+                <select id="videoBitrate" class="w-full p-3 border rounded focus:ring-blue-500">
+                  <option value="">Default</option>
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Local File Upload Section (video) -->
+          <div id="videoLocalUpload" class="hidden">
+            <div id="functionalDropZoneLocal" class="drop-zone rounded-xl p-8 text-center cursor-pointer">
+              <input type="file" id="functionalFileInputLocal" class="hidden" accept="video/*">
+              <div class="transform transition-transform">
+                <i data-lucide="upload-cloud" class="w-16 h-16 mx-auto text-red-500 mb-4 opacity-80"></i>
+                <p class="text-lg font-medium text-gray-700">Drag video here or click to upload</p>
+                <p class="text-sm text-gray-500 mt-2">Supported: MP4, AVI, MOV, MKV, WebM, etc.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- File Info -->
+          <div id="functionalFileInfo" class="hidden mt-4">
+            <div class="bg-white rounded-xl p-4 border flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div id="functionalFileIconBg" class="bg-blue-100 p-2 rounded-lg">
+                  <i data-lucide="file-text" class="w-6 h-6 text-blue-500"></i>
+                </div>
+                <div>
+                  <span id="functionalFileName" class="font-medium"></span>
+                  <p id="functionalFileSize" class="text-sm text-gray-500"></p>
+                </div>
+              </div>
+              <button id="functionalRemoveFile" class="text-gray-400 hover:text-red-500">
+                <i data-lucide="x" class="w-5 h-5"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Selection Section for Translator/Converter -->
+        <div id="functionalSelectSection" class="mb-6">
+          <label id="functionalSelectLabel" class="block text-sm font-medium text-gray-700">
+            Select Target Language and Output Format
+          </label>
+          <!-- Language dropdown -->
+          <select id="functionalTargetLang" class="w-full p-3 border rounded focus:ring-blue-500">
+            <option value="">Choose language...</option>
+          </select>
+          <!-- Format dropdown -->
+          <select id="functionalTargetFormat" class="w-full p-3 border rounded focus:ring-green-500 mt-2">
+            <option value="">Choose format...</option>
+            <option value="pdf">PDF</option>
+            <option value="docx">DOCX</option>
+            <option value="doc">DOC</option>
+            <option value="odt">ODT</option>
+            <option value="txt">TXT</option>
+            <option value="rtf">RTF</option>
+            <option value="ppt">PPT</option>
+            <option value="pptx">PPTX</option>
+            <option value="epub">EPUB</option>
+            <option value="srt">SRT</option>
+            <option value="mobi">MOBI</option>
+            <option value="sub">SUB</option>
+          </select>
+        </div>
+
+        <!-- Transcribe Options Section -->
+        <div id="transcribeOptionsSection" class="mb-6 hidden">
+          <label class="block text-sm font-medium text-gray-700">
+            Select Transcription/Translation Mode
+          </label>
+          <select id="transcribeModeSelect" class="w-full p-3 border rounded focus:ring-blue-500">
+            <option value="live_transcription">Live Transcription</option>
+            <option value="live_translation">Live Voice Translation</option>
+            <option value="file_transcription">File Transcription</option>
+            <option value="file_translation">File Translation</option>
+          </select>
+          <!-- Microphone button (shown only in live modes) -->
+          <button id="startMicBtn"
+                  class="mt-4 bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600 flex items-center gap-2"
+                  style="display:none;">
+            <i data-lucide="mic" class="w-5 h-5"></i> Start Microphone
+          </button>
+        </div>
+
+        <!-- Progress & Action Button -->
+        <div id="functionalProgressSection" class="hidden mb-4">
+          <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div id="functionalProgressBar" class="h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+          </div>
+          <p id="functionalStatusText" class="text-sm text-center text-gray-600 mt-2"></p>
+        </div>
+        <button id="functionalActionBtn" class="w-full bg-blue-500 text-white py-3 rounded hover:bg-blue-600 font-medium">
+          Execute
+        </button>
+        <button id="redDownloadBtn"
+                class="w-full bg-red-500 text-white py-3 rounded hover:bg-red-600 font-medium hidden mt-4">
+          Download File
+        </button>
+        <div id="downloadButtons" class="hidden mt-4"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Pricing Section -->
+  <section id="pricing" class="bg-gray-100 py-16">
+    <div class="container mx-auto px-6">
+      <h2 class="text-3xl font-bold text-center mb-12">Pricing</h2>
+      <div class="grid md:grid-cols-3 gap-8">
+        <div class="bg-white rounded-lg shadow p-6 flex flex-col">
+          <h3 class="text-xl font-semibold mb-4">Free</h3>
+          <p class="mb-6 text-gray-600">
+            Limited daily use: 3 documents per day, up to 5 pages, and 30-minute audio transcriptions.
+          </p>
+          <div class="text-3xl font-bold mb-6">$0<span class="text-lg font-normal">/month</span></div>
+          <ul class="mb-6 space-y-2">
+            <li>Translation in 98+ languages</li>
+            <li>Basic document conversion</li>
+            <li>Limited audio transcription</li>
+          </ul>
+          <a href="#"
+             class="mt-auto block text-center bg-[var(--secondary-color)] text-[var(--primary-color)] px-4 py-2 rounded hover:bg-yellow-400 transition">
+            Get Started
+          </a>
+        </div>
+        <div class="bg-white rounded-lg shadow p-6 flex flex-col border-4 border-[var(--secondary-color)]">
+          <h3 class="text-xl font-semibold mb-4">Plus</h3>
+          <p class="mb-6 text-gray-600">
+            Extended functionality with unlimited documents, advanced audio transcription, and enhanced processing speeds.
+          </p>
+          <div class="text-3xl font-bold mb-6">$20<span class="text-lg font-normal">/month</span></div>
+          <ul class="mb-6 space-y-2">
+            <li>Unlimited translation and conversion</li>
+            <li>Advanced audio transcription</li>
+            <li>Faster processing speeds</li>
+          </ul>
+          <a href="#"
+             class="mt-auto block text-center bg-[var(--secondary-color)] text-[var(--primary-color)] px-4 py-2 rounded hover:bg-yellow-400 transition">
+            Subscribe Now
+          </a>
+        </div>
+        <div class="bg-white rounded-lg shadow p-6 flex flex-col">
+          <h3 class="text-xl font-semibold mb-4">Pro</h3>
+          <p class="mb-6 text-gray-600">
+            Our full-featured package with maximum performance, priority support, and exclusive premium features.
+          </p>
+          <div class="text-3xl font-bold mb-6">$30<span class="text-lg font-normal">/month</span></div>
+          <ul class="mb-6 space-y-2">
+            <li>Complete translation, conversion & transcription</li>
+            <li>Priority customer support</li>
+            <li>Exclusive premium features</li>
+          </ul>
+          <a href="#"
+             class="mt-auto block text-center bg-[var(--secondary-color)] text-[var(--primary-color)] px-4 py-2 rounded hover:bg-yellow-400 transition">
+            Subscribe Now
+          </a>
+        </div>
+      </div>
+      <div class="mt-8 text-center">
+        <p class="text-gray-700">
+          MosaicMaster offers premium, all-in-one AI document services to meet your business and personal needs.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Testimonials Section -->
+  <section id="testimonials" class="py-16">
+    <div class="container mx-auto px-6">
+      <h2 class="text-3xl font-bold text-center mb-12">Our Recommendations</h2>
+      <div class="swiper testimonials-swiper">
+        <div class="swiper-wrapper">
+          <!-- (Your testimonial slides go here) -->
+        </div>
+        <div class="swiper-pagination"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Contact Section -->
+  <section id="contact" class="py-16">
+    <div class="container mx-auto px-6">
+      <h2 class="text-3xl font-bold text-center mb-12">Contact</h2>
+      <div class="max-w-xl mx-auto">
+        <form class="bg-white shadow rounded-lg p-6">
+          <div class="mb-4">
+            <label class="block text-gray-700 mb-2" for="name">Name</label>
+            <input class="w-full px-3 py-2 border rounded" type="text" id="name" placeholder="Your name">
+          </div>
+          <div class="mb-4">
+            <label class="block text-gray-700 mb-2" for="email">Email</label>
+            <input class="w-full px-3 py-2 border rounded" type="email" id="email" placeholder="Your email">
+          </div>
+          <div class="mb-4">
+            <label class="block text-gray-700 mb-2" for="message">Message</label>
+            <textarea class="w-full px-3 py-2 border rounded" id="message" rows="4" placeholder="Your message"></textarea>
+          </div>
+          <button class="w-full bg-[var(--primary-color)] text-white py-2 rounded hover:bg-[var(--secondary-color)] transition" type="submit">
+            Send
+          </button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="bg-[var(--primary-color)] text-white py-6">
+    <div class="container mx-auto px-6 text-center">
+      <p>&copy; 2025 MosaicMaster. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <!-- Swiper JS -->
+  <script src="https://unpkg.com/swiper/swiper-bundle.min.js"></script>
+
+  <!-- Main JavaScript -->
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      lucide.createIcons();
+
+      // Populate translator languages
+      const LANGUAGES = {
+        "Afrikaans": "af", "Albanian": "sq", "Amharic": "am", "Arabic": "ar", "Armenian": "hy",
+        "Azerbaijani": "az", "Bengali": "bn", "Bosnian": "bs", "Bulgarian": "bg", "Catalan": "ca",
+        "Chinese": "zh", "Croatian": "hr", "Czech": "cs", "Danish": "da", "Dutch": "nl",
+        "English": "en", "Estonian": "et", "Finnish": "fi", "French": "fr", "Georgian": "ka",
+        "German": "de", "Greek": "el", "Gujarati": "gu", "Hebrew": "he", "Hindi": "hi",
+        "Hungarian": "hu", "Italian": "it", "Japanese": "ja", "Korean": "ko", "Polish": "pl",
+        "Portuguese": "pt", "Romanian": "ro", "Russian": "ru", "Spanish": "es", "Swedish": "sv",
+        "Thai": "th", "Turkish": "tr", "Ukrainian": "uk", "Vietnamese": "vi"
+      };
+      const targetLangSelect = document.getElementById('functionalTargetLang');
+      for (const [name, code] of Object.entries(LANGUAGES)) {
+        const opt = document.createElement('option');
+        opt.value = code;
+        opt.textContent = name;
+        targetLangSelect.appendChild(opt);
+      }
+
+      let currentFile = null;
+      let currentMode = 'translator';
+      let connectionId = "";
+      let speakerRecognitionEnabled = false; // New global variable for speaker recognition
+
+      const translatorBtn = document.getElementById('translatorModeBtnFunc');
+      const videoBtn = document.getElementById('videoModeBtnFunc');
+      const transcribeBtn = document.getElementById('transcribeModeBtnFunc');
+      const converterBtn = document.getElementById('converterModeBtnFunc');
+
+      const dropZone = document.getElementById('functionalDropZone');
+      const fileInfo = document.getElementById('functionalFileInfo');
+      const progressSection = document.getElementById('functionalProgressSection');
+      const progressBar = document.getElementById('functionalProgressBar');
+      const statusText = document.getElementById('functionalStatusText');
+      const actionBtn = document.getElementById('functionalActionBtn');
+      const redDownloadBtn = document.getElementById('redDownloadBtn');
+      const downloadButtons = document.getElementById('downloadButtons');
+
+      const transcribeOptionsSection = document.getElementById('transcribeOptionsSection');
+      const startMicBtn = document.getElementById('startMicBtn');
+
+      // Hide / Show logic based on mode
+      function updateUI(mode) {
+        currentMode = mode;
+
+        // Hide advanced sections by default
+        document.getElementById('videoSourceOptions').classList.add('hidden');
+        document.getElementById('videoOptions').classList.add('hidden');
+        const localUp = document.getElementById('videoLocalUpload');
+        if (localUp) localUp.classList.add('hidden');
+        document.getElementById('functionalSelectSection').classList.add('hidden');
+        transcribeOptionsSection.classList.add('hidden');
+        dropZone.classList.remove('dragover');
+
+        // Reset file info
+        currentFile = null;
+        fileInfo.classList.add('hidden');
+        downloadButtons.innerHTML = '';
+        downloadButtons.classList.add('hidden');
+        redDownloadBtn.classList.add('hidden');
+
+        // Update button styles
+        translatorBtn.className = (mode === 'translator')
+          ? 'mode-switch active px-6 py-3 rounded-xl bg-blue-500 text-white flex items-center gap-2'
+          : 'mode-switch px-6 py-3 rounded-xl bg-gray-200 text-gray-600 flex items-center gap-2 hover:bg-gray-300';
+        videoBtn.className = (mode === 'video')
+          ? 'mode-switch active px-6 py-3 rounded-xl bg-red-500 text-white flex items-center gap-2'
+          : 'mode-switch px-6 py-3 rounded-xl bg-gray-200 text-gray-600 flex items-center gap-2 hover:bg-gray-300';
+        transcribeBtn.className = (mode === 'transcribe')
+          ? 'mode-switch active px-6 py-3 rounded-xl bg-purple-500 text-white flex items-center gap-2'
+          : 'mode-switch px-6 py-3 rounded-xl bg-gray-200 text-gray-600 flex items-center gap-2 hover:bg-gray-300';
+        converterBtn.className = (mode === 'converter')
+          ? 'mode-switch active px-6 py-3 rounded-xl bg-green-500 text-white flex items-center gap-2'
+          : 'mode-switch px-6 py-3 rounded-xl bg-gray-200 text-gray-600 flex items-center gap-2 hover:bg-gray-300';
+
+        // Setup each mode
+        if (mode === 'translator') {
+          dropZone.innerHTML = `
+            <div class="mb-4">
+              <input type="file" id="functionalFileInput" class="hidden"
+                     accept=".pdf,.docx,.doc,.odt,.txt,.rtf,.ppt,.pptx,.epub,.srt,.mobi,.sub">
+              <div class="transform transition-transform cursor-pointer" onclick="document.getElementById('functionalFileInput').click()">
+                <i data-lucide="upload-cloud" class="w-16 h-16 mx-auto text-blue-500 mb-4 opacity-80"></i>
+                <p class="text-lg font-medium text-gray-700">Drag file here or click to upload</p>
+                <p class="text-sm text-gray-500 mt-2">
+                  Supported: PDF, DOCX, DOC, ODT, TXT, RTF, PPT, PPTX, EPUB, SRT, MOBI, SUB
+                </p>
+              </div>
+            </div>`;
+          // Insert URL input below dropZone
+          const translatorURLContainer = document.getElementById('translatorURLContainer');
+          if(translatorURLContainer) {
+            translatorURLContainer.remove();
+          }
+          document.getElementById('functionalMain').insertAdjacentHTML('beforeend', `
+            <div id="translatorURLContainer" class="mt-4">
+              <input type="text" id="functionalURLInput" placeholder="Or paste a URL here" class="w-full p-3 border rounded focus:ring-blue-500">
+            </div>
+          `);
+          document.getElementById('functionalSelectSection').classList.remove('hidden');
+          document.getElementById('functionalSelectLabel').textContent = "Select Target Language and Output Format";
+          // Show language select
+          document.getElementById('functionalTargetLang').parentElement.classList.remove('hidden');
+          // Show format select
+          document.getElementById('functionalTargetFormat').parentElement.classList.remove('hidden');
+
+        } else if (mode === 'converter') {
+          dropZone.innerHTML = `
+            <input type="file" id="functionalFileInput" class="hidden"
+                   accept=".pdf,.docx,.doc,.odt,.txt,.rtf,.ppt,.pptx,.epub,.srt,.mobi,.sub,.jpg,.jpeg,.png,.gif">
+            <div class="transform transition-transform">
+              <i data-lucide="upload-cloud" class="w-16 h-16 mx-auto text-green-500 mb-4 opacity-80"></i>
+              <p class="text-lg font-medium text-gray-700">Drag file or image here or click to upload</p>
+              <p class="text-sm text-gray-500 mt-2">
+                Supported: PDF, DOCX, DOC, ODT, TXT, RTF, PPT, PPTX, EPUB, SRT, MOBI, SUB, JPG, JPEG, PNG, GIF
+              </p>
+            </div>`;
+          document.getElementById('functionalSelectSection').classList.remove('hidden');
+          document.getElementById('functionalSelectLabel').textContent = "Select Output Format";
+          // Hide language select
+          document.getElementById('functionalTargetLang').parentElement.classList.add('hidden');
+          // Show format select
+          document.getElementById('functionalTargetFormat').parentElement.classList.remove('hidden');
+
+        } else if (mode === 'transcribe') {
+          dropZone.innerHTML = `<input type="file" id="functionalFileInput" class="hidden" accept=".mp3,.wav,.ogg,.m4a">
+            <div class="transform transition-transform">
+              <i data-lucide="upload-cloud" class="w-16 h-16 mx-auto text-purple-500 mb-4 opacity-80"></i>
+              <p class="text-lg font-medium text-gray-700">Drag audio file here or click to upload</p>
+              <p class="text-sm text-gray-500 mt-2">
+                Supported: MP3, WAV, OGG, M4A
+              </p>
+            </div>`;
+          // Add speaker recognition toggle for transcribe mode
+          dropZone.innerHTML += '<div class="mt-4"><button id="speakerRecognitionToggle" class="bg-purple-500 text-white px-4 py-2 rounded">Speaker Recognition: Off</button></div>';
+          transcribeOptionsSection.classList.remove('hidden');
+          startMicBtn.style.display = 'none';
+          document.getElementById('speakerRecognitionToggle').addEventListener('click', function(){
+            speakerRecognitionEnabled = !speakerRecognitionEnabled;
+            this.textContent = 'Speaker Recognition: ' + (speakerRecognitionEnabled ? 'On' : 'Off');
+          });
+        } else if (mode === 'video') {
+          dropZone.innerHTML = `<input type="file" id="functionalFileInput" class="hidden">
+            <div>
+              <i data-lucide="upload-cloud" class="w-16 h-16 mx-auto text-red-500 mb-4 opacity-80"></i>
+              <p class="text-lg font-medium text-gray-700">[Video mode: see options below]</p>
+            </div>`;
+          // Add speaker recognition toggle for video mode
+          dropZone.innerHTML += '<div class="mt-4"><button id="speakerRecognitionToggle" class="bg-red-500 text-white px-4 py-2 rounded">Speaker Recognition: Off</button></div>';
+          document.getElementById('videoSourceOptions').classList.remove('hidden');
+          const sourceType = document.querySelector('input[name="videoSource"]:checked').value;
+          document.getElementById('videoOptions').classList.remove('hidden');
+          if (sourceType === "url") {
+            document.getElementById('videoLocalUpload').classList.add('hidden');
+          } else {
+            document.getElementById('videoLocalUpload').classList.remove('hidden');
+          }
+          document.getElementById('speakerRecognitionToggle').addEventListener('click', function(){
+            speakerRecognitionEnabled = !speakerRecognitionEnabled;
+            this.textContent = 'Speaker Recognition: ' + (speakerRecognitionEnabled ? 'On' : 'Off');
+          });
+        }
+
+        lucide.createIcons();
+        attachFileInputListener();
+      }
+
+      function attachFileInputListener() {
+        const fileInput = document.getElementById('functionalFileInput');
+        if (fileInput) {
+          fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) handleFile(e.target.files[0]);
+          });
+        }
+      }
+
+      function handleFile(file) {
+        currentFile = file;
+        document.getElementById('functionalFileName').textContent = file.name;
+        document.getElementById('functionalFileSize').textContent = formatFileSize(file.size);
+        fileInfo.classList.remove('hidden');
+      }
+
+      function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes','KB','MB','GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+      }
+
+      // Dropzone events
+      dropZone.addEventListener('click', () => {
+        const fInput = document.getElementById('functionalFileInput');
+        if (fInput) fInput.click();
+      });
+      dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+      });
+      dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('dragover');
+      });
+      dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
+      });
+
+      // Local video drop zone
+      const localDropZone = document.getElementById('functionalDropZoneLocal');
+      if(localDropZone) {
+        localDropZone.addEventListener('click', () => {
+          const fInputLocal = document.getElementById('functionalFileInputLocal');
+          if(fInputLocal) fInputLocal.click();
+        });
+        localDropZone.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          localDropZone.classList.add('dragover');
+        });
+        localDropZone.addEventListener('dragleave', () => {
+          localDropZone.classList.remove('dragover');
+        });
+        localDropZone.addEventListener('drop', (e) => {
+          e.preventDefault();
+          localDropZone.classList.remove('dragover');
+          if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
+        });
+      }
+
+      // Remove file
+      document.getElementById('functionalRemoveFile').addEventListener('click', () => {
+        currentFile = null;
+        fileInfo.classList.add('hidden');
+        const fInput = document.getElementById('functionalFileInput');
+        if (fInput) fInput.value = '';
+        const fInputLocal = document.getElementById('functionalFileInputLocal');
+        if (fInputLocal) fInputLocal.value = '';
+      });
+
+      // Radio for video source
+      document.getElementById('videoSourceURL').addEventListener('change', () => {
+        document.getElementById('videoOptions').classList.remove('hidden');
+        document.getElementById('videoLocalUpload').classList.add('hidden');
+      });
+      document.getElementById('videoSourceLocal').addEventListener('change', () => {
+        document.getElementById('videoOptions').classList.remove('hidden');
+        document.getElementById('videoLocalUpload').classList.remove('hidden');
+      });
+
+      // Subtitle checkbox
+      document.getElementById('videoGenerateSubtitles').addEventListener('change', (e) => {
+        if (e.target.checked) {
+          document.getElementById('videoSubtitleFormatSection').classList.remove('hidden');
+        } else {
+          document.getElementById('videoSubtitleFormatSection').classList.add('hidden');
+        }
+      });
+
+      // Transcribe mode => show microphone if live
+      document.getElementById('transcribeModeSelect').addEventListener('change', (e) => {
+        if (e.target.value === "live_transcription" || e.target.value === "live_translation") {
+          startMicBtn.style.display = 'flex';
+        } else {
+          startMicBtn.style.display = 'none';
+        }
+      });
+
+      // Simple microphone test
+      startMicBtn.addEventListener('click', async () => {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          alert("Microphone access granted! (Now you’d handle streaming audio to the server, etc.)");
+        } catch (err) {
+          alert("Failed to access microphone: " + err.message);
+        }
+      });
+
+      // WebSocket for progress
+      function startProgressWebSocket(connId) {
+        const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+        const ws = new WebSocket(`${protocol}://${window.location.host}/ws/${connId}`);
+        ws.onmessage = (event) => {
+          const data = JSON.parse(event.data);
+          progressBar.style.width = data.progress + "%";
+          statusText.textContent = data.status;
+        };
+        ws.onerror = (error) => console.error("WebSocket error:", error);
+      }
+
+      // Create download buttons
+      function createDownloadButtons(result) {
+        let html = "";
+        if (currentMode === 'translator') {
+          if (result.download_url) {
+            html += `<button onclick="window.open('${result.download_url}', '_blank')" class="bg-blue-500 text-white px-4 py-2 rounded mr-2">Download Translated File</button>`;
+          }
+          if (result.transcript_download_url) {
+            html += `<button onclick="window.open('${result.transcript_download_url}', '_blank')" class="bg-blue-500 text-white px-4 py-2 rounded">Download Transcript</button>`;
+          }
+        } else if (currentMode === 'converter') {
+          if (result.download_url) {
+            html += `<button onclick="window.open('${result.download_url}', '_blank')" class="bg-green-500 text-white px-4 py-2 rounded">Download Converted File</button>`;
+          }
+        } else if (currentMode === 'transcribe') {
+          if (result.download_url || result.api_transcript_url) {
+            const url = result.download_url ? result.download_url : result.api_transcript_url;
+            html += `<button onclick="window.open('${url}', '_blank')" class="bg-purple-500 text-white px-4 py-2 rounded">Download Transcription</button>`;
+          }
+        } else if (currentMode === 'video') {
+          if (result.download_urls) {
+            if (result.download_urls.video_mp4) {
+              html += `<button onclick="window.open('${result.download_urls.video_mp4}', '_blank')" class="bg-red-500 text-white px-4 py-2 rounded mr-2 mb-2">Download Video (MP4)</button>`;
+            }
+            for (const key in result.download_urls) {
+              if (key !== "video_mp4") {
+                let btnText = "Download";
+                if (key.includes("audio")) btnText = "Download Audio (MP3)";
+                else if (key.includes("subtitles")) btnText = "Download Subtitles";
+                else if (key.includes("video_converted")) btnText = "Download Converted Video";
+                html += `<button onclick="window.open('${result.download_urls[key]}', '_blank')" class="bg-red-500 text-white px-4 py-2 rounded mr-2 mb-2">${btnText}</button>`;
+              }
+            }
+          }
+        }
+        downloadButtons.innerHTML = html;
+        downloadButtons.classList.remove('hidden');
+      }
+
+      // Execute button
+      actionBtn.addEventListener('click', async () => {
+        let formData = new FormData();
+        connectionId = crypto.randomUUID();
+        formData.append("connection_id", connectionId);
+        startProgressWebSocket(connectionId);
+        
+        let endpoint = "";
+        if (currentMode === "translator") {
+          const urlInput = document.getElementById('functionalURLInput');
+          const urlValue = urlInput ? urlInput.value.trim() : "";
+          
+          if (!currentFile && !urlValue) {
+            alert("Please upload a file or enter a URL first!");
+            return;
+          }
+          if (currentFile && urlValue) {
+            alert("Please provide either a file or a URL, not both!");
+            return;
+          }
+          
+          if (urlValue) {
+             formData.append("url", urlValue);
+          } else {
+             formData.append("file", currentFile);
+          }
+          
+          const lang = document.getElementById('functionalTargetLang').value;
+          if (!lang) {
+            alert("Please select a target language!");
+            return;
+          }
+          formData.append("target_lang", lang);
+          formData.append("target_format", document.getElementById('functionalTargetFormat').value || "pdf");
+          endpoint = "/api/translate";
+        } else if (currentMode === "converter" || currentMode === "transcribe") {
+          if (!currentFile) {
+            alert("Please upload a file first!");
+            return;
+          }
+          formData.append("file", currentFile);
+          if (currentMode === "converter") {
+            const convFormat = document.getElementById('functionalTargetFormat').value;
+            if (!convFormat) {
+              alert("Please select a target format!");
+              return;
+            }
+            formData.append("target_format", convFormat);
+            endpoint = "/api/convert";
+          } else if (currentMode === "transcribe") {
+            const modeSelect = document.getElementById('transcribeModeSelect').value;
+            formData.append("transcribe_mode", modeSelect);
+            if (modeSelect === "live_translation") {
+              formData.append("live_translation", "true");
+            }
+            // Append speaker recognition flag for transcribe mode
+            formData.append("identify_speakers", speakerRecognitionEnabled);
+            endpoint = "/api/transcribe";
+          }
+        } else if (currentMode === "video") {
+          const sourceType = document.querySelector('input[name="videoSource"]:checked').value;
+          if (sourceType === "url") {
+            const videoURL = document.getElementById('videoURLInput').value.trim();
+            if (!videoURL) {
+              alert("Please enter a video URL!");
+              return;
+            }
+            formData.append("url", videoURL);
+          } else if (sourceType === "local") {
+            if (!currentFile) {
+              alert("Please upload a local video file!");
+              return;
+            }
+            formData.append("file", currentFile);
+          }
+          formData.append("platform", document.getElementById('videoPlatform').value);
+          formData.append("convert_mp3", document.getElementById('videoConvertMP3').checked);
+          formData.append("generate_subtitles", document.getElementById('videoGenerateSubtitles').checked);
+          formData.append("subtitle_format", document.getElementById('videoSubtitleFormat').value || "srt");
+          formData.append("target_video_format", document.getElementById('targetVideoFormat').value);
+          formData.append("resolution", document.getElementById('videoResolution').value);
+          formData.append("bitrate", document.getElementById('videoBitrate').value);
+          // Append speaker recognition flag for video mode
+          formData.append("identify_speakers", speakerRecognitionEnabled);
+          endpoint = "/api/video";
+        }
+
+        actionBtn.disabled = true;
+        progressSection.classList.remove('hidden');
+        progressBar.style.width = "0%";
+        statusText.textContent = "";
+
+        try {
+          const response = await fetch(endpoint, { method: "POST", body: formData });
+          if (!response.ok) {
+            throw new Error(await response.text());
+          }
+          const result = await response.json();
+          progressBar.style.width = "100%";
+          if (currentMode === "translator") statusText.textContent = "Translation complete!";
+          else if (currentMode === "converter") statusText.textContent = "Conversion complete!";
+          else if (currentMode === "transcribe") statusText.textContent = "Transcription complete!";
+          else if (currentMode === "video") statusText.textContent = "Video processing complete!";
+
+          createDownloadButtons(result);
+
+          if (currentMode === 'translator' || currentMode === 'converter') {
+            if (result.download_url) {
+              redDownloadBtn.onclick = () => window.open(result.download_url, '_blank');
+              redDownloadBtn.classList.remove('hidden');
+            }
+          } else if (currentMode === 'transcribe') {
+            if (result.download_url || result.api_transcript_url) {
+              const url = result.download_url ? result.download_url : result.api_transcript_url;
+              redDownloadBtn.onclick = () => window.open(url, '_blank');
+              redDownloadBtn.classList.remove('hidden');
+            }
+          } else if (currentMode === 'video') {
+            if (result.download_urls && result.download_urls.video_mp4) {
+              redDownloadBtn.onclick = () => window.open(result.download_urls.video_mp4, '_blank');
+              redDownloadBtn.classList.remove('hidden');
+            }
+          }
+        } catch (err) {
+          alert(err.message);
+          progressBar.classList.add("bg-red-500");
+        } finally {
+          actionBtn.disabled = false;
+        }
+      });
+
+      // Mode switch
+      translatorBtn.addEventListener('click', () => updateUI('translator'));
+      videoBtn.addEventListener('click', () => updateUI('video'));
+      transcribeBtn.addEventListener('click', () => updateUI('transcribe'));
+      converterBtn.addEventListener('click', () => updateUI('converter'));
+
+      // Default to translator
+      updateUI('translator');
+
+      // Swiper init
+      var featuresSwiper = new Swiper('.features-swiper', {
+        loop: true,
+        autoplay: {
+          delay: 7000,
+          disableOnInteraction: false,
+        },
+        speed: 2000,
+        pagination: {
+          el: '.features-swiper .swiper-pagination',
+          clickable: true,
+        },
+      });
+      var testimonialsSwiper = new Swiper('.testimonials-swiper', {
+        loop: true,
+        autoplay: {
+          delay: 5000,
+          disableOnInteraction: false,
+        },
+        speed: 1000,
+        pagination: {
+          el: '.testimonials-swiper .swiper-pagination',
+          clickable: true,
+        },
+      });
+    });
+  </script>
+</body>
+</html>
+

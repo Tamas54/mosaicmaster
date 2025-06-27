@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text Reader | MosaicMaster</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <style>
+        :root {
+            --primary-color: #0D1B2A;
+            --secondary-color: #D4AF37;
+            --text-reader-accent: #9333ea;
+        }
+        
+        .background-image {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: url('/static/ravenna.jpg') no-repeat center center;
+            background-size: cover;
+            opacity: 0.1;
+            z-index: -1;
+        }
+        
+        .drop-zone {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .drop-zone.dragover {
+            border-color: var(--text-reader-accent);
+            background-color: #f3f4f6;
+        }
+        
+        .text-mode-btn.active {
+            background-color: var(--text-reader-accent) !important;
+            color: white !important;
+        }
+        
+        .input-mode {
+            transition: all 0.3s ease;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Background -->
+    <div class="background-image"></div>
+    
+    <!-- Header -->
+    <header class="bg-[var(--primary-color)] text-white py-4">
+        <div class="container mx-auto px-6 flex justify-between items-center">
+            <div class="flex items-center gap-4">
+                <a href="/" class="text-2xl font-bold hover:text-[var(--secondary-color)] transition">MosaicMaster</a>
+                <span class="text-[var(--secondary-color)]">|</span>
+                <h1 class="text-xl font-semibold">🎤 Text Reader</h1>
+            </div>
+            <nav>
+                <ul class="flex space-x-4">
+                    <li><a href="/" class="hover:text-[var(--secondary-color)] transition">Home</a></li>
+                    <li><a href="/video-player.html" class="hover:text-[var(--secondary-color)] transition">Video Player</a></li>
+                    <li><a href="/live-streams.html" class="hover:text-[var(--secondary-color)] transition">Live Streams</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-6 py-8">
+        <div class="max-w-4xl mx-auto">
+            <!-- Title and Description -->
+            <div class="text-center mb-8">
+                <h2 class="text-3xl font-bold text-gray-800 mb-4">Text to Speech Converter</h2>
+                <p class="text-lg text-gray-600">
+                    Convert your text or documents into natural-sounding audio files with automatic language detection.
+                    Supports multiple document formats and provides high-quality text-to-speech conversion.
+                </p>
+            </div>
+
+            <!-- Main Widget -->
+            <div class="bg-white rounded-lg shadow-lg p-8">
+                <!-- Input Mode Selection -->
+                <div class="mb-6">
+                    <div class="flex justify-center gap-4 mb-6">
+                        <button id="textModeBtn" class="text-mode-btn active px-6 py-3 rounded-lg font-medium transition flex items-center gap-2">
+                            <i data-lucide="type" class="w-5 h-5"></i>Text Input
+                        </button>
+                        <button id="fileModeBtn" class="text-mode-btn bg-gray-200 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-300 font-medium transition flex items-center gap-2">
+                            <i data-lucide="file-text" class="w-5 h-5"></i>Document Upload
+                        </button>
+                        <button id="linkModeBtn" class="text-mode-btn bg-gray-200 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-300 font-medium transition flex items-center gap-2">
+                            <i data-lucide="link" class="w-5 h-5"></i>Web Link
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Text Input Mode -->
+                <div id="textInputMode" class="input-mode">
+                    <label class="block text-gray-700 font-medium mb-2">Enter your text:</label>
+                    <textarea id="textReaderInput" 
+                              class="w-full h-40 p-4 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                              placeholder="Type or paste your text here..."></textarea>
+                </div>
+
+                <!-- File Upload Mode -->
+                <div id="fileUploadMode" class="input-mode hidden">
+                    <div id="textReaderDropZone" class="drop-zone">
+                        <input type="file" id="textReaderFileInput" class="hidden" accept=".txt,.rtf,.doc,.docx,.pdf,.odt,.jpg,.jpeg,.png,.gif">
+                        <i data-lucide="upload-cloud" class="w-16 h-16 mx-auto text-gray-400 mb-4"></i>
+                        <p class="text-gray-600 mb-2 text-lg font-medium">Drop your document or image here or click to upload</p>
+                        <p class="text-sm text-gray-500">Supported formats: TXT, RTF, DOC, DOCX, PDF, ODT, JPG, PNG, GIF (OCR)</p>
+                    </div>
+                    
+                    <!-- File Info Display -->
+                    <div id="textReaderFileInfo" class="hidden mt-4 p-4 bg-gray-50 rounded-lg">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <i data-lucide="file-text" class="w-6 h-6 text-purple-600"></i>
+                                <div>
+                                    <span id="textReaderFileName" class="font-medium text-gray-800"></span>
+                                    <p id="textReaderFileSize" class="text-sm text-gray-500"></p>
+                                </div>
+                            </div>
+                            <button id="textReaderRemoveFile" class="text-gray-400 hover:text-red-500 transition">
+                                <i data-lucide="x" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Web Link Mode -->
+                <div id="linkInputMode" class="input-mode hidden">
+                    <label class="block text-gray-700 font-medium mb-2">Enter web link URL:</label>
+                    <div class="space-y-4">
+                        <input type="url" id="textReaderLinkInput" 
+                               class="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                               placeholder="https://example.com/article or https://example.com/document.pdf">
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <div class="flex items-start gap-3">
+                                <i data-lucide="info" class="w-5 h-5 text-blue-600 mt-0.5"></i>
+                                <div class="text-sm text-blue-700">
+                                    <p class="font-medium mb-2">Supported web content:</p>
+                                    <ul class="space-y-1">
+                                        <li>• HTML web pages (articles, blog posts, news)</li>
+                                        <li>• PDF documents from direct URLs</li>
+                                        <li>• Plain text content</li>
+                                    </ul>
+                                    <p class="mt-2 text-xs text-blue-600">The system will automatically extract the main content from web pages.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Language Selection -->
+                <div class="mt-6">
+                    <label class="block text-gray-700 font-medium mb-2">Language (leave empty for auto-detection):</label>
+                    <select id="textReaderLanguage" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500">
+                        <option value="">Auto-detect language</option>
+                        <option value="hu">Hungarian (Magyar)</option>
+                        <option value="en">English</option>
+                        <option value="de">German (Deutsch)</option>
+                        <option value="fr">French (Français)</option>
+                        <option value="es">Spanish (Español)</option>
+                        <option value="it">Italian (Italiano)</option>
+                        <option value="ro">Romanian (Română)</option>
+                        <option value="sk">Slovak (Slovenčina)</option>
+                        <option value="cs">Czech (Čeština)</option>
+                        <option value="pl">Polish (Polski)</option>
+                        <option value="ru">Russian (Русский)</option>
+                        <option value="pt">Portuguese (Português)</option>
+                        <option value="nl">Dutch (Nederlands)</option>
+                        <option value="sv">Swedish (Svenska)</option>
+                        <option value="da">Danish (Dansk)</option>
+                        <option value="no">Norwegian (Norsk)</option>
+                        <option value="fi">Finnish (Suomi)</option>
+                    </select>
+                </div>
+
+                <!-- Progress Section -->
+                <div id="textReaderProgress" class="hidden mt-6">
+                    <div class="bg-gray-200 rounded-full h-3 mb-3">
+                        <div id="textReaderProgressBar" class="bg-purple-600 h-3 rounded-full transition-all duration-500" style="width: 0%"></div>
+                    </div>
+                    <p id="textReaderStatus" class="text-sm text-gray-600 text-center font-medium"></p>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="mt-8 flex gap-4">
+                    <button id="textReaderGenerateBtn" class="flex-1 bg-purple-600 text-white py-4 px-6 rounded-lg hover:bg-purple-700 transition font-medium text-lg">
+                        <i data-lucide="volume-2" class="w-5 h-5 inline mr-2"></i>Generate Audio
+                    </button>
+                    <button id="textReaderPlayBtn" class="hidden bg-green-600 text-white py-4 px-6 rounded-lg hover:bg-green-700 transition font-medium">
+                        <i data-lucide="play" class="w-5 h-5 inline mr-2"></i>Play
+                    </button>
+                    <button id="textReaderStopBtn" class="hidden bg-red-600 text-white py-4 px-6 rounded-lg hover:bg-red-700 transition font-medium">
+                        <i data-lucide="square" class="w-5 h-5 inline mr-2"></i>Stop
+                    </button>
+                </div>
+
+                <!-- Download Section -->
+                <div id="textReaderDownloads" class="hidden mt-8">
+                    <h4 class="font-medium text-gray-800 mb-4 text-lg">📥 Download Audio Files:</h4>
+                    <div id="textReaderDownloadButtons" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+                </div>
+
+                <!-- Audio Player Section -->
+                <div id="audioPlayerSection" class="hidden mt-8">
+                    <h4 class="font-medium text-gray-800 mb-4 text-lg">🎵 Audio Player:</h4>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <audio id="audioPlayer" controls class="w-full">
+                            Your browser does not support the audio element.
+                        </audio>
+                        <div class="mt-3 flex justify-between items-center text-sm text-gray-600">
+                            <span id="currentTrackInfo">Ready to play</span>
+                            <div class="flex gap-2">
+                                <button id="prevTrackBtn" class="bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded">
+                                    <i data-lucide="skip-back" class="w-4 h-4"></i>
+                                </button>
+                                <button id="nextTrackBtn" class="bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded">
+                                    <i data-lucide="skip-forward" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Info Section -->
+            <div class="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
+                <h3 class="font-semibold text-blue-800 mb-2">📌 How to use:</h3>
+                <ul class="text-blue-700 space-y-1">
+                    <li>• Choose between text input, document upload, or web link</li>
+                    <li>• Supports documents (DOC, DOCX, PDF, ODT, TXT, RTF) and images with OCR (JPG, PNG, GIF)</li>
+                    <li>• Web links: Articles, blog posts, and PDF documents from URLs</li>
+                    <li>• Select your preferred language or let the system auto-detect it</li>
+                    <li>• Click "Generate Audio" to create speech files</li>
+                    <li>• For long texts, multiple audio chunks will be created</li>
+                    <li>• Use the built-in player or download files for offline use</li>
+                </ul>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-[var(--primary-color)] text-white py-6 mt-12">
+        <div class="container mx-auto px-6 text-center">
+            <p>&copy; 2025 MosaicMaster. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            lucide.createIcons();
+
+            // Global variables
+            let currentJob = null;
+            let currentAudioFiles = [];
+            let currentTrackIndex = 0;
+            let statusCheckInterval = null;
+
+            // DOM elements
+            const textModeBtn = document.getElementById('textModeBtn');
+            const fileModeBtn = document.getElementById('fileModeBtn');
+            const linkModeBtn = document.getElementById('linkModeBtn');
+            const textInputMode = document.getElementById('textInputMode');
+            const fileUploadMode = document.getElementById('fileUploadMode');
+            const linkInputMode = document.getElementById('linkInputMode');
+            const textReaderInput = document.getElementById('textReaderInput');
+            const textReaderLinkInput = document.getElementById('textReaderLinkInput');
+            const dropZone = document.getElementById('textReaderDropZone');
+            const fileInput = document.getElementById('textReaderFileInput');
+            const fileInfo = document.getElementById('textReaderFileInfo');
+            const fileName = document.getElementById('textReaderFileName');
+            const fileSize = document.getElementById('textReaderFileSize');
+            const removeFileBtn = document.getElementById('textReaderRemoveFile');
+            const languageSelect = document.getElementById('textReaderLanguage');
+            const progressSection = document.getElementById('textReaderProgress');
+            const progressBar = document.getElementById('textReaderProgressBar');
+            const statusText = document.getElementById('textReaderStatus');
+            const generateBtn = document.getElementById('textReaderGenerateBtn');
+            const playBtn = document.getElementById('textReaderPlayBtn');
+            const stopBtn = document.getElementById('textReaderStopBtn');
+            const downloadsSection = document.getElementById('textReaderDownloads');
+            const downloadButtons = document.getElementById('textReaderDownloadButtons');
+            const audioPlayerSection = document.getElementById('audioPlayerSection');
+            const audioPlayer = document.getElementById('audioPlayer');
+            const currentTrackInfo = document.getElementById('currentTrackInfo');
+            const prevTrackBtn = document.getElementById('prevTrackBtn');
+            const nextTrackBtn = document.getElementById('nextTrackBtn');
+
+            let currentFile = null;
+
+            // Mode switching
+            function switchMode(mode) {
+                // Reset all modes
+                textModeBtn.classList.remove('active');
+                fileModeBtn.classList.remove('active');
+                linkModeBtn.classList.remove('active');
+                textInputMode.classList.add('hidden');
+                fileUploadMode.classList.add('hidden');
+                linkInputMode.classList.add('hidden');
+                
+                // Activate selected mode
+                if (mode === 'text') {
+                    textModeBtn.classList.add('active');
+                    textInputMode.classList.remove('hidden');
+                } else if (mode === 'file') {
+                    fileModeBtn.classList.add('active');
+                    fileUploadMode.classList.remove('hidden');
+                } else if (mode === 'link') {
+                    linkModeBtn.classList.add('active');
+                    linkInputMode.classList.remove('hidden');
+                }
+                resetInterface();
+            }
+
+            // Reset interface
+            function resetInterface() {
+                currentJob = null;
+                currentFile = null;
+                currentAudioFiles = [];
+                currentTrackIndex = 0;
+                progressSection.classList.add('hidden');
+                downloadsSection.classList.add('hidden');
+                audioPlayerSection.classList.add('hidden');
+                fileInfo.classList.add('hidden');
+                if (statusCheckInterval) {
+                    clearInterval(statusCheckInterval);
+                    statusCheckInterval = null;
+                }
+            }
+
+            // File handling
+            function formatFileSize(bytes) {
+                if (bytes === 0) return '0 Bytes';
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+
+            function handleFile(file) {
+                currentFile = file;
+                fileName.textContent = file.name;
+                fileSize.textContent = formatFileSize(file.size);
+                fileInfo.classList.remove('hidden');
+            }
+
+            // Drag and drop
+            dropZone.addEventListener('click', () => fileInput.click());
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('dragover');
+            });
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.classList.remove('dragover');
+            });
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('dragover');
+                if (e.dataTransfer.files.length > 0) {
+                    handleFile(e.dataTransfer.files[0]);
+                }
+            });
+
+            // File input change
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    handleFile(e.target.files[0]);
+                }
+            });
+
+            // Remove file
+            removeFileBtn.addEventListener('click', () => {
+                currentFile = null;
+                fileInfo.classList.add('hidden');
+                fileInput.value = '';
+            });
+
+            // Mode buttons
+            textModeBtn.addEventListener('click', () => switchMode('text'));
+            fileModeBtn.addEventListener('click', () => switchMode('file'));
+            linkModeBtn.addEventListener('click', () => switchMode('link'));
+
+            // Generate audio
+            generateBtn.addEventListener('click', async () => {
+                const isTextMode = !textInputMode.classList.contains('hidden');
+                const isFileMode = !fileUploadMode.classList.contains('hidden');
+                const isLinkMode = !linkInputMode.classList.contains('hidden');
+                const text = isTextMode ? textReaderInput.value.trim() : '';
+                const link = isLinkMode ? textReaderLinkInput.value.trim() : '';
+                const language = languageSelect.value;
+
+                if (isTextMode && !text) {
+                    alert('Please enter some text!');
+                    return;
+                }
+
+                if (isFileMode && !currentFile) {
+                    alert('Please upload a document!');
+                    return;
+                }
+
+                if (isLinkMode && !link) {
+                    alert('Please enter a web link!');
+                    return;
+                }
+
+                if (isLinkMode && !link.startsWith('http://') && !link.startsWith('https://')) {
+                    alert('Please enter a valid URL starting with http:// or https://');
+                    return;
+                }
+
+                // Show progress
+                progressSection.classList.remove('hidden');
+                progressBar.style.width = '0%';
+                statusText.textContent = 'Starting audio generation...';
+                generateBtn.disabled = true;
+
+                try {
+                    const formData = new FormData();
+                    
+                    if (isTextMode) {
+                        formData.append('text', text);
+                    } else if (isFileMode) {
+                        formData.append('file', currentFile);
+                    } else if (isLinkMode) {
+                        formData.append('url', link);
+                    }
+                    
+                    if (language) {
+                        formData.append('language', language);
+                    }
+
+                    const response = await fetch('/api/text-reader/generate', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.detail || 'Failed to generate audio');
+                    }
+
+                    const result = await response.json();
+                    currentJob = result.job_id;
+                    
+                    // Start status checking
+                    statusCheckInterval = setInterval(checkStatus, 2000);
+                    
+                } catch (error) {
+                    alert('Error: ' + error.message);
+                    progressSection.classList.add('hidden');
+                } finally {
+                    generateBtn.disabled = false;
+                }
+            });
+
+            // Check status
+            async function checkStatus() {
+                if (!currentJob) return;
+
+                try {
+                    const response = await fetch(`/api/text-reader/status/${currentJob}`);
+                    if (!response.ok) return;
+
+                    const status = await response.json();
+                    
+                    if (status.status === 'processing') {
+                        // Calculate actual progress based on chunks
+                        let progressPercentage = 0;
+                        if (status.total_chunks > 0) {
+                            progressPercentage = Math.round((status.processed_chunks / status.total_chunks) * 90);
+                        } else {
+                            // Simulate progress if we don't have chunk info yet
+                            const currentWidth = parseInt(progressBar.style.width) || 0;
+                            progressPercentage = Math.min(currentWidth + 10, 90);
+                        }
+                        
+                        progressBar.style.width = progressPercentage + '%';
+                        
+                        if (status.total_chunks > 0) {
+                            statusText.textContent = `Generating audio... (${status.processed_chunks}/${status.total_chunks} chunks completed)`;
+                        } else {
+                            statusText.textContent = `Generating audio... (${status.chunk_count || 0} chunks)`;
+                        }
+                    } else if (status.status === 'completed') {
+                        progressBar.style.width = '100%';
+                        statusText.textContent = 'Audio generation completed!';
+                        
+                        if (statusCheckInterval) {
+                            clearInterval(statusCheckInterval);
+                            statusCheckInterval = null;
+                        }
+                        
+                        // Show downloads
+                        if (status.download_urls && status.download_urls.length > 0) {
+                            currentAudioFiles = status.download_urls;
+                            showDownloads(status.download_urls);
+                            setupAudioPlayer();
+                        }
+                    } else if (status.status === 'error') {
+                        statusText.textContent = 'Error: ' + (status.error_message || 'Unknown error');
+                        progressBar.style.backgroundColor = '#ef4444';
+                        
+                        if (statusCheckInterval) {
+                            clearInterval(statusCheckInterval);
+                            statusCheckInterval = null;
+                        }
+                    }
+                } catch (error) {
+                    console.error('Status check error:', error);
+                }
+            }
+
+            // Show downloads
+            function showDownloads(audioFiles) {
+                downloadButtons.innerHTML = '';
+                
+                audioFiles.forEach((file, index) => {
+                    const btn = document.createElement('button');
+                    btn.className = 'bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition flex items-center gap-2';
+                    btn.innerHTML = `<i data-lucide="download" class="w-4 h-4"></i>Part ${index + 1}`;
+                    btn.onclick = () => window.open(file.download_url, '_blank');
+                    downloadButtons.appendChild(btn);
+                });
+
+                downloadsSection.classList.remove('hidden');
+                lucide.createIcons();
+            }
+
+            // Setup audio player
+            function setupAudioPlayer() {
+                if (currentAudioFiles.length > 0) {
+                    loadTrack(0);
+                    audioPlayerSection.classList.remove('hidden');
+                    playBtn.classList.remove('hidden');
+                }
+            }
+
+            // Load track
+            function loadTrack(index) {
+                if (index >= 0 && index < currentAudioFiles.length) {
+                    currentTrackIndex = index;
+                    audioPlayer.src = currentAudioFiles[index].download_url;
+                    currentTrackInfo.textContent = `Playing: ${currentAudioFiles[index].filename}`;
+                }
+            }
+
+            // Audio player controls
+            playBtn.addEventListener('click', () => {
+                audioPlayer.play();
+                playBtn.classList.add('hidden');
+                stopBtn.classList.remove('hidden');
+            });
+
+            stopBtn.addEventListener('click', () => {
+                audioPlayer.pause();
+                audioPlayer.currentTime = 0;
+                stopBtn.classList.add('hidden');
+                playBtn.classList.remove('hidden');
+            });
+
+            prevTrackBtn.addEventListener('click', () => {
+                if (currentTrackIndex > 0) {
+                    loadTrack(currentTrackIndex - 1);
+                }
+            });
+
+            nextTrackBtn.addEventListener('click', () => {
+                if (currentTrackIndex < currentAudioFiles.length - 1) {
+                    loadTrack(currentTrackIndex + 1);
+                }
+            });
+
+            // Auto-play next track
+            audioPlayer.addEventListener('ended', () => {
+                if (currentTrackIndex < currentAudioFiles.length - 1) {
+                    loadTrack(currentTrackIndex + 1);
+                    audioPlayer.play();
+                } else {
+                    stopBtn.classList.add('hidden');
+                    playBtn.classList.remove('hidden');
+                }
+            });
+
+            // Initialize in text mode
+            switchMode('text');
+        });
+    </script>
+</body>
+</html>

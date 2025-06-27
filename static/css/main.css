@@ -1,0 +1,317 @@
+/**
+ * MosaicMaster WebUI - Main CSS
+ * Core styles for the entire application
+ */
+
+:root {
+    --primary-color: #0D1B2A;
+    --primary-light: #1D2B3A;
+    --primary-dark: #05101A;
+    --secondary-color: #D4AF37;
+    --secondary-light: #E4BF47;
+    --secondary-dark: #B49027;
+    --accent-color: #A4161A;
+    --accent-light: #B4262A;
+    --accent-dark: #94060A;
+    --transcribe-accent: #9333ea;
+    --text-light: #FFFFFF;
+    --text-dark: #333333;
+    --panel-bg: #1A2635;
+    --panel-header: #0D1B2A;
+    --border-color: #2A3645;
+    --editor-accent: #D4AF37;
+}
+
+body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: var(--primary-color);
+    color: var(--text-light);
+    overflow: hidden;
+    position: relative;
+}
+
+/* Global mosaic background */
+body::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: url('/static/ravenna.jpg') no-repeat center center;
+    background-size: cover;
+    opacity: 0.06;
+    z-index: -2;
+    pointer-events: none;
+}
+
+/* Top Menu Bar */
+.menu-bar {
+    background-color: var(--primary-dark);
+    padding: 6px;
+    display: flex;
+    align-items: center;
+    border-bottom: 2px solid var(--secondary-color);
+}
+
+.menu-item {
+    padding: 2px 10px;
+    cursor: pointer;
+    margin-right: 5px;
+    color: var(--text-light);
+    font-weight: 500;
+    border-radius: 3px;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.menu-item:hover {
+    background-color: var(--secondary-color);
+    color: var(--primary-dark);
+}
+
+.app-logo {
+    margin-right: 15px;
+    font-weight: bold;
+    color: var(--secondary-color);
+    display: flex;
+    align-items: center;
+}
+
+/* Navbar (Toolbar) Styles */
+.navbar {
+    background-color: var(--primary-color);
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    border-top: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.toolbar-group {
+    display: flex;
+    border-right: 1px solid var(--border-color);
+    padding-right: 10px;
+    margin-right: 10px;
+}
+
+.navbar button {
+    background-color: var(--primary-light);
+    border: 1px solid var(--border-color);
+    color: var(--text-light);
+    padding: 5px 10px;
+    margin: 0 2px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.2s, border-color 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    min-width: 36px;
+}
+
+.navbar button:hover {
+    background-color: var(--secondary-color);
+    color: var(--primary-dark);
+    border-color: var(--secondary-dark);
+}
+
+/* Module Tabs Styling */
+.module-tabs .tab-button {
+    padding: 6px 12px;
+    border-radius: 4px 4px 0 0;
+    border-bottom: 3px solid transparent;
+    background-color: var(--primary-color);
+}
+
+.module-tabs .tab-button.active {
+    border-bottom: 3px solid var(--secondary-color);
+    background-color: var(--primary-light);
+    color: var(--secondary-color);
+}
+
+.navbar-spacer {
+    flex: 1;
+}
+
+.status-indicator {
+    background-color: var(--primary-light);
+    padding: 4px 10px;
+    border-radius: 3px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    background-color: #4caf50;
+    border-radius: 50%;
+    margin-right: 5px;
+}
+
+/* Main Container */
+.main-container {
+    display: flex;
+    flex-wrap: wrap;
+    height: calc(100vh - 350px);
+    overflow: auto;
+    min-height: 300px;
+    padding: 5px;
+    gap: 5px;
+}
+
+/* Panels */
+.panel {
+    background-color: var(--panel-bg);
+    border-radius: 4px;
+    overflow: auto;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.panel-content {
+    padding: 10px;
+}
+
+.header {
+    background-color: var(--panel-header);
+    padding: 8px 12px;
+    font-weight: 500;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.header-controls {
+    display: flex;
+    gap: 5px;
+}
+
+.collapse-btn {
+    width: 20px;
+    height: 20px;
+    background-color: var(--primary-light);
+    border-radius: 2px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+    font-size: 14px;
+}
+
+/* Properties and Controls */
+.property-row {
+    margin-bottom: 10px;
+}
+
+.property-name {
+    font-size: 14px;
+    margin-bottom: 4px;
+    color: var(--text-light);
+    opacity: 0.8;
+}
+
+.property-value {
+    display: flex;
+    align-items: center;
+}
+
+.time-input {
+    background-color: var(--primary-light);
+    border: 1px solid var(--border-color);
+    color: var(--text-light);
+    padding: 3px;
+    border-radius: 3px;
+}
+
+.slider-container {
+    flex: 1;
+    margin-right: 10px;
+}
+
+/* Dialog styling */
+.dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.dialog-modal {
+    background: var(--panel-bg);
+    border-radius: 6px;
+    max-width: 500px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+}
+
+.dialog-header {
+    background: var(--panel-header);
+    padding: 10px 15px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.dialog-content {
+    padding: 15px;
+}
+
+.dialog-footer {
+    border-top: 1px solid var(--border-color);
+    padding: 10px 15px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+    .main-container {
+        flex-direction: column;
+        height: auto;
+        overflow-y: auto;
+        max-height: calc(100vh - 200px);
+    }
+    
+    .preview-panel {
+        order: -1;
+        margin-bottom: 10px;
+    }
+    
+    .properties-panel, .project-files, .effects-panel, .subtitles-panel {
+        width: 100%;
+        max-width: none;
+        margin-bottom: 10px;
+    }
+}
+
+/* Timer indicator */
+.timer-indicator {
+    position: fixed;
+    top: 5px;
+    right: 5px;
+    background-color: var(--primary-dark);
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    z-index: 1000;
+    border: 1px solid var(--secondary-color);
+    opacity: 0.8;
+}

@@ -1,0 +1,764 @@
+<!-- MosaicMaster Advanced Subtitle Editor Component -->
+<div class="subtitle-editor-panel" id="subtitleEditorPanel">
+    <div class="header">
+        <span><i class="fas fa-closed-captioning" style="margin-right: 5px;"></i>Felirat Szerkesztő</span>
+        <div class="header-controls">
+            <button title="Felirat importálása" class="tool-btn"><i class="fas fa-file-import"></i></button>
+            <button title="Felirat exportálása" class="tool-btn"><i class="fas fa-file-export"></i></button>
+            <div class="collapse-btn">-</div>
+        </div>
+    </div>
+    
+    <div class="toolbar subtitles-toolbar">
+        <button title="Új felirat" class="subtitle-btn"><i class="fas fa-plus"></i> Új</button>
+        <button title="Felirat törlése" class="subtitle-btn"><i class="fas fa-trash-alt"></i> Törlés</button>
+        <button title="Időzítés igazítása" class="subtitle-btn"><i class="fas fa-clock"></i> Időzítés</button>
+        <button title="Automatikus fordítás" class="subtitle-btn accent-btn"><i class="fas fa-language"></i> Fordítás</button>
+        <div class="spacer"></div>
+        <select id="subtitleLanguage" class="subtitle-select">
+            <option value="hu">Magyar</option>
+            <option value="en">Angol</option>
+            <option value="de">Német</option>
+            <option value="fr">Francia</option>
+            <option value="es">Spanyol</option>
+            <option value="it">Olasz</option>
+            <option value="ru">Orosz</option>
+            <option value="zh">Kínai</option>
+            <option value="ja">Japán</option>
+            <option value="ko">Koreai</option>
+        </select>
+    </div>
+    
+    <div class="subtitle-list-container">
+        <div class="subtitle-list-header">
+            <div class="subtitle-column subtitle-time-column">Időpont</div>
+            <div class="subtitle-column subtitle-duration-column">Időtartam</div>
+            <div class="subtitle-column subtitle-text-column">Felirat szövege</div>
+            <div class="subtitle-column subtitle-action-column">Műveletek</div>
+        </div>
+        
+        <div class="subtitle-list">
+            <div class="subtitle-item" data-id="subtitle-1">
+                <div class="subtitle-column subtitle-time-column">00:00:05.200</div>
+                <div class="subtitle-column subtitle-duration-column">3.5s</div>
+                <div class="subtitle-column subtitle-text-column">Üdvözöljük a MosaicMaster videószerkesztőben!</div>
+                <div class="subtitle-column subtitle-action-column">
+                    <button class="subtitle-item-btn" title="Szerkesztés"><i class="fas fa-edit"></i></button>
+                    <button class="subtitle-item-btn" title="Törlés"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
+            
+            <div class="subtitle-item selected" data-id="subtitle-2">
+                <div class="subtitle-column subtitle-time-column">00:00:08.800</div>
+                <div class="subtitle-column subtitle-duration-column">4.2s</div>
+                <div class="subtitle-column subtitle-text-column">A legjobb AI-alapú videószerkesztő platform</div>
+                <div class="subtitle-column subtitle-action-column">
+                    <button class="subtitle-item-btn" title="Szerkesztés"><i class="fas fa-edit"></i></button>
+                    <button class="subtitle-item-btn" title="Törlés"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
+            
+            <div class="subtitle-item" data-id="subtitle-3">
+                <div class="subtitle-column subtitle-time-column">00:00:14.100</div>
+                <div class="subtitle-column subtitle-duration-column">5.0s</div>
+                <div class="subtitle-column subtitle-text-column">Próbálja ki speciális felirat funkcióinkat!</div>
+                <div class="subtitle-column subtitle-action-column">
+                    <button class="subtitle-item-btn" title="Szerkesztés"><i class="fas fa-edit"></i></button>
+                    <button class="subtitle-item-btn" title="Törlés"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
+            
+            <div class="subtitle-item" data-id="subtitle-4">
+                <div class="subtitle-column subtitle-time-column">00:00:19.500</div>
+                <div class="subtitle-column subtitle-duration-column">3.8s</div>
+                <div class="subtitle-column subtitle-text-column">A színek és stílusok testreszabhatók</div>
+                <div class="subtitle-column subtitle-action-column">
+                    <button class="subtitle-item-btn" title="Szerkesztés"><i class="fas fa-edit"></i></button>
+                    <button class="subtitle-item-btn" title="Törlés"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
+            
+            <div class="subtitle-item" data-id="subtitle-5">
+                <div class="subtitle-column subtitle-time-column">00:00:24.200</div>
+                <div class="subtitle-column subtitle-duration-column">4.5s</div>
+                <div class="subtitle-column subtitle-text-column">Akár több nyelven is egyidejűleg</div>
+                <div class="subtitle-column subtitle-action-column">
+                    <button class="subtitle-item-btn" title="Szerkesztés"><i class="fas fa-edit"></i></button>
+                    <button class="subtitle-item-btn" title="Törlés"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="subtitle-editor-form">
+        <div class="subtitle-editor-header">
+            <h3>Felirat szerkesztése</h3>
+        </div>
+        
+        <div class="editor-form-row">
+            <div class="form-group">
+                <label>Kezdés</label>
+                <input type="text" value="00:00:08.800" class="subtitle-input time-input">
+            </div>
+            <div class="form-group">
+                <label>Időtartam</label>
+                <input type="text" value="4.2" class="subtitle-input">
+                <span class="input-suffix">mp</span>
+            </div>
+            <div class="form-group">
+                <label>Vég</label>
+                <input type="text" value="00:00:13.000" class="subtitle-input time-input">
+            </div>
+        </div>
+        
+        <div class="editor-form-row">
+            <div class="form-group full-width">
+                <label>Felirat szövege</label>
+                <textarea class="subtitle-textarea">A legjobb AI-alapú videószerkesztő platform</textarea>
+            </div>
+        </div>
+        
+        <div class="editor-form-row">
+            <div class="form-group">
+                <label>Betűtípus</label>
+                <select class="subtitle-input">
+                    <option>Arial</option>
+                    <option selected>Montserrat</option>
+                    <option>Roboto</option>
+                    <option>Open Sans</option>
+                    <option>Times New Roman</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Méret</label>
+                <input type="number" value="32" min="8" max="72" class="subtitle-input">
+                <span class="input-suffix">px</span>
+            </div>
+            <div class="form-group">
+                <label>Stílus</label>
+                <div class="style-buttons">
+                    <button class="style-btn" title="Félkövér"><i class="fas fa-bold"></i></button>
+                    <button class="style-btn active" title="Dőlt"><i class="fas fa-italic"></i></button>
+                    <button class="style-btn" title="Aláhúzott"><i class="fas fa-underline"></i></button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="editor-form-row">
+            <div class="form-group">
+                <label>Szövegszín</label>
+                <div class="color-control">
+                    <div class="color-preview" style="background-color: #FFFFFF;"></div>
+                    <input type="text" value="#FFFFFF" class="subtitle-input color-input">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Háttér</label>
+                <div class="color-control">
+                    <div class="color-preview" style="background-color: rgba(0,0,0,0.5);"></div>
+                    <input type="text" value="rgba(0,0,0,0.5)" class="subtitle-input color-input">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Körvonal</label>
+                <div class="color-control">
+                    <div class="color-preview" style="background-color: #000000;"></div>
+                    <input type="text" value="#000000" class="subtitle-input color-input">
+                </div>
+            </div>
+        </div>
+        
+        <div class="subtitle-presets">
+            <h4>Szín sablonok</h4>
+            <div class="color-presets">
+                <div class="color-preset" style="background: linear-gradient(to bottom, #FFFFFF, #EEEEEE); color: #000000; border-color: #000000;" title="Alap (fehér)"></div>
+                <div class="color-preset" style="background: linear-gradient(to bottom, #FFF200, #FFD000); color: #000000; border-color: #000000;" title="Kiemelés (sárga)"></div>
+                <div class="color-preset" style="background: linear-gradient(to bottom, #00A0FF, #0080FF); color: #FFFFFF; border-color: #FFFFFF;" title="Információ (kék)"></div>
+                <div class="color-preset active" style="background: linear-gradient(to bottom, #D4AF37, #B49027); color: #000000; border-color: #000000;" title="MosaicMaster (arany)"></div>
+                <div class="color-preset" style="background: linear-gradient(to bottom, #FF6B6B, #FF5252); color: #FFFFFF; border-color: #000000;" title="Figyelem (piros)"></div>
+                <div class="color-preset" style="background: linear-gradient(to bottom, #66BB6A, #4CAF50); color: #FFFFFF; border-color: #000000;" title="Pozitív (zöld)"></div>
+                <div class="color-preset" style="background: linear-gradient(to bottom, #9575CD, #7E57C2); color: #FFFFFF; border-color: #000000;" title="Hangsúlyos (lila)"></div>
+                <div class="color-preset" style="background: linear-gradient(to bottom, transparent, transparent); color: #FFFFFF; border: 1px dashed #FFFFFF;" title="Egyedi..."></div>
+            </div>
+        </div>
+        
+        <div class="subtitle-position">
+            <h4>Pozíció a képernyőn</h4>
+            <div class="position-grid">
+                <div class="position-cell" data-position="top-left"></div>
+                <div class="position-cell" data-position="top-center"></div>
+                <div class="position-cell" data-position="top-right"></div>
+                <div class="position-cell" data-position="middle-left"></div>
+                <div class="position-cell active" data-position="middle-center"></div>
+                <div class="position-cell" data-position="middle-right"></div>
+                <div class="position-cell" data-position="bottom-left"></div>
+                <div class="position-cell" data-position="bottom-center"></div>
+                <div class="position-cell" data-position="bottom-right"></div>
+            </div>
+        </div>
+        
+        <div class="editor-preview">
+            <h4>Előnézet</h4>
+            <div class="preview-container">
+                <div class="preview-video-frame">
+                    <img src="/api/placeholder/500/200" alt="Videó előnézet">
+                    <div class="preview-subtitle" style="font-family: Montserrat; font-size: 32px; color: #FFFFFF; background-color: rgba(0,0,0,0.5); text-shadow: 2px 2px 2px #000000; font-style: italic;">
+                        A legjobb AI-alapú videószerkesztő platform
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="editor-actions">
+            <button class="subtitle-btn cancel-btn"><i class="fas fa-times"></i> Mégsem</button>
+            <button class="subtitle-btn accent-btn"><i class="fas fa-save"></i> Mentés</button>
+            <button class="subtitle-btn"><i class="fas fa-plus"></i> Mentés újként</button>
+        </div>
+    </div>
+</div>
+
+<!-- CSS Styles for Subtitle Editor -->
+<style>
+.subtitle-editor-panel {
+    background-color: var(--panel-bg);
+    border-radius: 4px;
+    overflow: auto;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 80%;
+    max-width: 1000px;
+    height: 80vh;
+    max-height: 700px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+}
+
+.subtitles-toolbar {
+    background-color: var(--primary-dark);
+    padding: 6px;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.subtitle-btn {
+    background-color: var(--primary-light);
+    border: 1px solid var(--border-color);
+    color: var(--text-light);
+    padding: 4px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: background-color 0.2s, color 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.subtitle-btn:hover {
+    background-color: var(--secondary-color);
+    color: var(--primary-dark);
+}
+
+.accent-btn {
+    background-color: var(--accent-color);
+    border-color: var(--accent-dark);
+}
+
+.accent-btn:hover {
+    background-color: var(--accent-light);
+}
+
+.spacer {
+    flex: 1;
+}
+
+.subtitle-select {
+    background-color: var(--primary-light);
+    color: var(--text-light);
+    border: 1px solid var(--border-color);
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-size: 13px;
+}
+
+.subtitle-list-container {
+    flex: 1;
+    overflow: auto;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.subtitle-list-header {
+    display: flex;
+    padding: 8px;
+    background-color: var(--primary-dark);
+    font-weight: bold;
+    border-bottom: 1px solid var(--border-color);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.subtitle-list {
+    overflow-y: auto;
+}
+
+.subtitle-item {
+    display: flex;
+    padding: 8px;
+    border-bottom: 1px solid var(--border-color);
+    transition: background-color 0.2s;
+    cursor: pointer;
+}
+
+.subtitle-item:hover {
+    background-color: var(--primary-light);
+}
+
+.subtitle-item.selected {
+    background-color: rgba(212, 175, 55, 0.2);
+    border-left: 3px solid var(--secondary-color);
+}
+
+.subtitle-column {
+    padding: 0 5px;
+}
+
+.subtitle-time-column {
+    width: 120px;
+    font-family: monospace;
+}
+
+.subtitle-duration-column {
+    width: 80px;
+    text-align: center;
+}
+
+.subtitle-text-column {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.subtitle-action-column {
+    width: 80px;
+    text-align: right;
+}
+
+.subtitle-item-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-light);
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+    padding: 2px 5px;
+}
+
+.subtitle-item-btn:hover {
+    opacity: 1;
+    color: var(--secondary-color);
+}
+
+.subtitle-editor-form {
+    padding: 15px;
+    background-color: var(--panel-bg);
+    border-top: 1px solid var(--border-color);
+    max-height: 60%;
+    overflow-y: auto;
+}
+
+.subtitle-editor-header {
+    margin-bottom: 15px;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 10px;
+}
+
+.subtitle-editor-header h3 {
+    margin: 0;
+    color: var(--secondary-color);
+    font-size: 16px;
+}
+
+.editor-form-row {
+    display: flex;
+    margin-bottom: 15px;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 120px;
+}
+
+.form-group.full-width {
+    width: 100%;
+    flex-basis: 100%;
+}
+
+.form-group label {
+    font-size: 12px;
+    margin-bottom: 5px;
+    color: var(--secondary-color);
+}
+
+.subtitle-input {
+    background-color: var(--primary-light);
+    border: 1px solid var(--border-color);
+    color: var(--text-light);
+    padding: 6px 8px;
+    border-radius: 3px;
+    font-size: 13px;
+}
+
+.subtitle-input:focus {
+    border-color: var(--secondary-color);
+    outline: none;
+}
+
+.time-input {
+    font-family: monospace;
+}
+
+.subtitle-textarea {
+    background-color: var(--primary-light);
+    border: 1px solid var(--border-color);
+    color: var(--text-light);
+    padding: 8px;
+    border-radius: 3px;
+    min-height: 60px;
+    resize: vertical;
+    font-size: 14px;
+}
+
+.subtitle-textarea:focus {
+    border-color: var(--secondary-color);
+    outline: none;
+}
+
+.input-suffix {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-light);
+    opacity: 0.7;
+    font-size: 12px;
+}
+
+.style-buttons {
+    display: flex;
+    gap: 5px;
+}
+
+.style-btn {
+    background-color: var(--primary-light);
+    border: 1px solid var(--border-color);
+    color: var(--text-light);
+    width: 32px;
+    height: 32px;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.style-btn:hover {
+    background-color: var(--primary-dark);
+}
+
+.style-btn.active {
+    background-color: var(--secondary-color);
+    color: var(--primary-dark);
+}
+
+.color-control {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.color-preview {
+    width: 24px;
+    height: 24px;
+    border-radius: 3px;
+    border: 1px solid var(--border-color);
+}
+
+.color-input {
+    flex: 1;
+}
+
+.subtitle-presets, .subtitle-position {
+    margin-bottom: 15px;
+}
+
+.subtitle-presets h4, .subtitle-position h4 {
+    margin: 0 0 10px 0;
+    font-size: 14px;
+    color: var(--secondary-color);
+}
+
+.color-presets {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.color-preset {
+    width: 30px;
+    height: 30px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: transform 0.2s;
+    border: 1px solid transparent;
+}
+
+.color-preset:hover {
+    transform: scale(1.1);
+}
+
+.color-preset.active {
+    box-shadow: 0 0 0 2px var(--secondary-color);
+}
+
+.position-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 5px;
+    width: 120px;
+    height: 120px;
+}
+
+.position-cell {
+    background-color: var(--primary-light);
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.position-cell:hover {
+    background-color: var(--secondary-light);
+}
+
+.position-cell.active {
+    background-color: var(--secondary-color);
+    border-color: var(--secondary-dark);
+}
+
+.editor-preview {
+    margin-top: 20px;
+}
+
+.editor-preview h4 {
+    margin: 0 0 10px 0;
+    font-size: 14px;
+    color: var(--secondary-color);
+}
+
+.preview-container {
+    width: 100%;
+    background-color: var(--primary-dark);
+    border-radius: 3px;
+    overflow: hidden;
+    position: relative;
+}
+
+.preview-video-frame {
+    width: 100%;
+    position: relative;
+}
+
+.preview-video-frame img {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.preview-subtitle {
+    position: absolute;
+    left: 50%;
+    bottom: 10%;
+    transform: translateX(-50%);
+    padding: 8px 16px;
+    text-align: center;
+    border-radius: 3px;
+    max-width: 80%;
+}
+
+.editor-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 20px;
+    gap: 10px;
+}
+
+.cancel-btn {
+    background-color: var(--primary-light);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .subtitle-editor-panel {
+        width: 95%;
+        height: 90vh;
+    }
+    
+    .editor-form-row {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .form-group {
+        width: 100%;
+    }
+}
+</style>
+
+<!-- JavaScript for Subtitle Editor -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Subtitle item selection
+    const subtitleItems = document.querySelectorAll('.subtitle-item');
+    subtitleItems.forEach(item => {
+        item.addEventListener('click', function() {
+            subtitleItems.forEach(i => i.classList.remove('selected'));
+            this.classList.add('selected');
+        });
+    });
+    
+    // Style buttons toggle
+    const styleButtons = document.querySelectorAll('.style-btn');
+    styleButtons.forEach(btn => {
+        btn.addEventListener('click', function() {
+            this.classList.toggle('active');
+        });
+    });
+    
+    // Color presets selection
+    const colorPresets = document.querySelectorAll('.color-preset');
+    colorPresets.forEach(preset => {
+        preset.addEventListener('click', function() {
+            colorPresets.forEach(p => p.classList.remove('active'));
+            this.classList.add('active');
+            
+            // In a real implementation, this would update the color inputs and preview
+            const bgColor = window.getComputedStyle(this).backgroundImage || window.getComputedStyle(this).backgroundColor;
+            const textColor = window.getComputedStyle(this).color;
+            
+            // Update preview
+            const previewSubtitle = document.querySelector('.preview-subtitle');
+            if (previewSubtitle) {
+                if (bgColor.includes('transparent')) {
+                    previewSubtitle.style.backgroundColor = 'transparent';
+                } else if (bgColor.includes('gradient')) {
+                    previewSubtitle.style.background = bgColor;
+                } else {
+                    previewSubtitle.style.backgroundColor = bgColor;
+                }
+                
+                previewSubtitle.style.color = textColor;
+            }
+        });
+    });
+    
+    // Position grid selection
+    const positionCells = document.querySelectorAll('.position-cell');
+    positionCells.forEach(cell => {
+        cell.addEventListener('click', function() {
+            positionCells.forEach(c => c.classList.remove('active'));
+            this.classList.add('active');
+            
+            // Update preview subtitle position based on selected cell
+            const position = this.getAttribute('data-position');
+            const previewSubtitle = document.querySelector('.preview-subtitle');
+            
+            if (previewSubtitle && position) {
+                // Reset all position styles
+                previewSubtitle.style.top = 'auto';
+                previewSubtitle.style.bottom = 'auto';
+                previewSubtitle.style.left = 'auto';
+                previewSubtitle.style.right = 'auto';
+                previewSubtitle.style.transform = 'none';
+                
+                // Set new position
+                if (position.includes('top')) {
+                    previewSubtitle.style.top = '10%';
+                } else if (position.includes('middle')) {
+                    previewSubtitle.style.top = '50%';
+                    previewSubtitle.style.transform = 'translateY(-50%)';
+                } else if (position.includes('bottom')) {
+                    previewSubtitle.style.bottom = '10%';
+                }
+                
+                if (position.includes('left')) {
+                    previewSubtitle.style.left = '10%';
+                    previewSubtitle.style.transform = position.includes('middle') ? 
+                        'translate(0, -50%)' : 'none';
+                } else if (position.includes('center')) {
+                    previewSubtitle.style.left = '50%';
+                    previewSubtitle.style.transform = position.includes('middle') ? 
+                        'translate(-50%, -50%)' : 'translateX(-50%)';
+                } else if (position.includes('right')) {
+                    previewSubtitle.style.right = '10%';
+                    previewSubtitle.style.transform = position.includes('middle') ? 
+                        'translate(0, -50%)' : 'none';
+                }
+            }
+        });
+    });
+    
+    // Input changes updating the preview
+    const fontSelect = document.querySelector('.form-group:nth-child(1) .subtitle-input');
+    const fontSizeInput = document.querySelector('.form-group:nth-child(2) .subtitle-input');
+    const textColorInput = document.querySelector('.color-input[value="#FFFFFF"]');
+    const bgColorInput = document.querySelector('.color-input[value="rgba(0,0,0,0.5)"]');
+    const outlineColorInput = document.querySelector('.color-input[value="#000000"]');
+    const subtitleTextarea = document.querySelector('.subtitle-textarea');
+    
+    function updatePreview() {
+        const previewSubtitle = document.querySelector('.preview-subtitle');
+        if (!previewSubtitle) return;
+        
+        if (fontSelect) previewSubtitle.style.fontFamily = fontSelect.value;
+        if (fontSizeInput) previewSubtitle.style.fontSize = fontSizeInput.value + 'px';
+        if (textColorInput) previewSubtitle.style.color = textColorInput.value;
+        if (bgColorInput) previewSubtitle.style.backgroundColor = bgColorInput.value;
+        if (outlineColorInput) previewSubtitle.style.textShadow = `2px 2px 2px ${outlineColorInput.value}`;
+        if (subtitleTextarea) previewSubtitle.textContent = subtitleTextarea.value;
+        
+        // Update style based on style buttons
+        const boldBtn = document.querySelector('.style-btn:nth-child(1)');
+        const italicBtn = document.querySelector('.style-btn:nth-child(2)');
+        const underlineBtn = document.querySelector('.style-btn:nth-child(3)');
+        
+        previewSubtitle.style.fontWeight = boldBtn && boldBtn.classList.contains('active') ? 'bold' : 'normal';
+        previewSubtitle.style.fontStyle = italicBtn && italicBtn.classList.contains('active') ? 'italic' : 'normal';
+        previewSubtitle.style.textDecoration = underlineBtn && underlineBtn.classList.contains('active') ? 'underline' : 'none';
+    }
+    
+    // Add event listeners to all inputs
+    const inputs = document.querySelectorAll('.subtitle-input, .subtitle-textarea');
+    inputs.forEach(input => {
+        input.addEventListener('input', updatePreview);
+    });
+    
+    // Initialize when open
+    updatePreview();
+});
+</script>

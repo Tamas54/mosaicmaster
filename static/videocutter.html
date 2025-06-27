@@ -1,0 +1,2647 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MosaicMaster | Videó Vágó és Szerkesztő</title>
+    <meta name="description" content="MosaicMaster - Az AI-alapú videó és dokumentum manipuláló platform. Szerkesszen, konvertáljon, feliratozzon és osszon meg tartalmakat egyszerűen.">
+    <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+    <link rel="shortcut icon" href="/static/favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Plyr video player - more compatible alternative -->
+    <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
+    <script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
+    
+    <!-- Video.js CSS and JS with additional plugins (keep for backwards compatibility) -->
+    <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
+    <script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
+    <!-- VideoJS codec support plugins -->
+    <script src="https://cdn.jsdelivr.net/npm/@videojs/http-streaming@3.9.0/dist/videojs-http-streaming.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/videojs-contrib-quality-levels/2.1.0/videojs-contrib-quality-levels.min.js"></script>
+    <!-- OGV.js (Ogg/Theora codec) -->
+    <script src="https://cdn.jsdelivr.net/npm/ogv@1.8.5/dist/ogv.js"></script>
+    <!-- Enable for MediaElement.js fallback if needed -->
+    <script>
+        // Add codec support check
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log("Codec support check:");
+            var video = document.createElement('video');
+            console.log("MP4 (H.264) support:", video.canPlayType('video/mp4; codecs="avc1.42E01E, mp4a.40.2"'));
+            console.log("WebM support:", video.canPlayType('video/webm; codecs="vp8, vorbis"'));
+            console.log("OGV support:", video.canPlayType('video/ogg; codecs="theora, vorbis"'));
+            console.log("Native MKV support:", video.canPlayType('video/x-matroska; codecs="avc1.42E01E, mp4a.40.2"'));
+        });
+    </script>
+    <style>
+        /* MosaicMaster WebUI - Redesigned CSS */
+        :root {
+            --primary-color: #0D1B2A;
+            --primary-light: #1D2B3A;
+            --primary-dark: #05101A;
+            --secondary-color: #D4AF37;
+            --secondary-light: #E4BF47;
+            --secondary-dark: #B49027;
+            --accent-color: #A4161A;
+            --accent-light: #B4262A;
+            --accent-dark: #94060A;
+            --transcribe-accent: #9333ea;
+            --text-light: #FFFFFF;
+            --text-dark: #333333;
+            --panel-bg: #1A2635;
+            --panel-header: #0D1B2A;
+            --border-color: #2A3645;
+            --editor-accent: #D4AF37;
+        }
+
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--primary-color);
+            color: var(--text-light);
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Global mosaic background */
+        body::before {
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: url('/static/ravenna.jpg') no-repeat center center;
+            background-size: cover;
+            opacity: 0.06;
+            z-index: -2;
+            pointer-events: none;
+        }
+
+        .menu-bar {
+            background-color: var(--primary-dark);
+            padding: 6px;
+            display: flex;
+            align-items: center;
+            border-bottom: 2px solid var(--secondary-color);
+        }
+
+        .menu-item {
+            padding: 2px 10px;
+            cursor: pointer;
+            margin-right: 5px;
+            color: var(--text-light);
+            font-weight: 500;
+            border-radius: 3px;
+            transition: background-color 0.2s, color 0.2s;
+        }
+
+        .menu-item:hover {
+            background-color: var(--secondary-color);
+            color: var(--primary-dark);
+        }
+
+        .app-logo {
+            margin-right: 15px;
+            font-weight: bold;
+            color: var(--secondary-color);
+            display: flex;
+            align-items: center;
+        }
+
+        .navbar {
+            background-color: var(--primary-color);
+            padding: 8px;
+            display: flex;
+            align-items: center;
+            border-top: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .toolbar-group {
+            display: flex;
+            border-right: 1px solid var(--border-color);
+            padding-right: 10px;
+            margin-right: 10px;
+        }
+
+        .navbar button {
+            background-color: var(--primary-light);
+            border: 1px solid var(--border-color);
+            color: var(--text-light);
+            padding: 5px 10px;
+            margin: 0 2px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.2s, border-color 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            min-width: 36px;
+        }
+
+        .navbar button:hover {
+            background-color: var(--secondary-color);
+            color: var(--primary-dark);
+            border-color: var(--secondary-dark);
+        }
+        
+        .module-tabs .tab-button {
+            padding: 6px 12px;
+            border-radius: 4px 4px 0 0;
+            border-bottom: 3px solid transparent;
+            background-color: var(--primary-color);
+        }
+        
+        .module-tabs .tab-button.active {
+            border-bottom: 3px solid var(--secondary-color);
+            background-color: var(--primary-light);
+            color: var(--secondary-color);
+        }
+
+        .navbar-spacer {
+            flex: 1;
+        }
+
+        .status-indicator {
+            background-color: var(--primary-light);
+            padding: 4px 10px;
+            border-radius: 3px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background-color: #4caf50;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+
+        .main-container {
+            display: flex;
+            flex-wrap: wrap;
+            height: calc(100vh - 350px);
+            overflow: auto;
+            min-height: 300px;
+            padding: 5px;
+            gap: 5px;
+        }
+
+        .panel {
+            background-color: var(--panel-bg);
+            border-radius: 4px;
+            overflow: auto;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        .properties-panel {
+            width: 250px;
+            min-width: 250px;
+        }
+
+        .project-files {
+            flex: 1;
+            min-width: 300px;
+            max-width: 400px;
+        }
+
+        .preview-panel {
+            flex: 2;
+            min-width: 400px;
+        }
+
+        .effects-panel, .subtitles-panel {
+            width: 250px;
+            min-width: 250px;
+        }
+
+        .timeline {
+            height: 300px;
+            background-color: var(--panel-bg);
+            margin: 5px;
+            border-radius: 4px;
+            overflow: auto;
+            position: relative;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+        
+        /* Time markers */
+        .time-markings {
+            width: 100%;
+            position: relative;
+            height: 100%;
+        }
+        
+        .time-marking {
+            position: absolute;
+            height: 8px;
+            width: 1px;
+            background-color: var(--border-color);
+            top: 0;
+        }
+        
+        .time-marking.major {
+            height: 12px;
+            width: 2px;
+            background-color: var(--secondary-color);
+        }
+        
+        .time-label {
+            position: absolute;
+            top: 14px;
+            font-size: 10px;
+            transform: translateX(-50%);
+            color: var(--secondary-color);
+        }
+        
+        .timeline-marker {
+            position: absolute;
+            top: 0;
+            width: 3px;
+            height: 100%;
+            background-color: var(--accent-color);
+            z-index: 10;
+            box-shadow: 0 0 5px rgba(164, 22, 26, 0.5);
+        }
+        
+        /* Timeline marker handle */
+        .timeline-marker::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: -4px;
+            width: 11px;
+            height: 11px;
+            background-color: var(--accent-color);
+            border-radius: 50%;
+            box-shadow: 0 0 5px rgba(164, 22, 26, 0.5);
+        }
+        
+        /* Trim region styling */
+        .trim-region {
+            position: absolute;
+            height: 12px;
+            background-color: rgba(212, 175, 55, 0.3);
+            border: 2px solid var(--secondary-color);
+            border-radius: 4px;
+            z-index: 5;
+            top: 40px; /* Position directly below the timeline */
+            cursor: move;
+        }
+        
+        /* Time labels for trim handles */
+        .trim-handle-label {
+            position: absolute;
+            bottom: -20px;
+            font-size: 11px;
+            background-color: var(--primary-dark);
+            color: var(--secondary-color);
+            padding: 2px 4px;
+            border-radius: 3px;
+            transform: translateX(-50%);
+            white-space: nowrap;
+            border: 1px solid var(--secondary-color);
+            pointer-events: none;
+        }
+        
+        /* Label positioning is now relative to the handle */
+        .trim-handle-label.left {
+            left: 50%;
+            z-index: 16 !important; /* Even higher z-index for labels */
+        }
+        
+        .trim-handle-label.right {
+            left: 50%;
+            z-index: 16 !important; /* Even higher z-index for labels */
+        }
+        
+        /* Trim handles */
+        .trim-handle {
+            width: 16px;
+            height: 30px;
+            background-color: var(--secondary-color);
+            top: -10px;
+            border-radius: 3px;
+            cursor: ew-resize !important;
+            z-index: 15 !important; /* Higher z-index to ensure visibility */
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+            display: flex !important; /* Force display */
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .trim-handle:hover {
+            background-color: var(--secondary-light);
+            transform: scale(1.1);
+        }
+        
+        /* Positioning is now done inline */
+        
+        /* Add grip lines to handles */
+        .trim-handle::before, 
+        .trim-handle::after {
+            content: '';
+            width: 2px;
+            height: 12px;
+            background-color: var(--primary-dark);
+            position: absolute;
+        }
+        
+        .trim-handle::before {
+            left: 5px;
+        }
+        
+        .trim-handle::after {
+            right: 5px;
+        }
+
+        .header {
+            background-color: var(--panel-header);
+            padding: 8px 10px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--secondary-color);
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 5px;
+        }
+
+        .collapse-btn {
+            cursor: pointer;
+            font-size: 16px;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 3px;
+            background-color: var(--primary-light);
+            transition: background-color 0.2s;
+        }
+
+        .collapse-btn:hover {
+            background-color: var(--accent-color);
+        }
+
+        .tabs {
+            display: flex;
+            background-color: var(--primary-dark);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .tab {
+            padding: 8px 16px;
+            cursor: pointer;
+            transition: background-color 0.2s, color 0.2s;
+            border-right: 1px solid var(--border-color);
+            font-size: 13px;
+        }
+
+        .tab.active {
+            background-color: var(--panel-bg);
+            border-top: 2px solid var(--secondary-color);
+            color: var(--secondary-color);
+        }
+
+        .tab:hover:not(.active) {
+            background-color: var(--primary-light);
+        }
+
+        .property-row {
+            display: flex;
+            padding: 6px 10px;
+            border-bottom: 1px solid var(--border-color);
+            align-items: center;
+            background-color: var(--panel-bg);
+        }
+
+        .property-row:nth-child(odd) {
+            background-color: var(--primary-light);
+        }
+
+        .property-name {
+            flex: 1;
+            font-size: 14px;
+        }
+
+        .property-value {
+            flex: 1;
+            display: flex;
+            align-items: center;
+        }
+
+        .property-table {
+            background-color: var(--panel-bg);
+            padding: 5px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .property-table select {
+            background-color: var(--primary-light);
+            color: var(--text-light);
+            border: 1px solid var(--border-color);
+            padding: 3px;
+            border-radius: 3px;
+        }
+
+        .property-table select:focus {
+            border-color: var(--secondary-color);
+            outline: none;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            margin-right: 5px;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            height: 4px;
+            background: var(--border-color);
+            border-radius: 2px;
+            flex: 1;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px;
+            height: 12px;
+            background: var(--secondary-color);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .filter-tabs {
+            display: flex;
+            background-color: var(--primary-dark);
+            padding: 4px;
+            border-bottom: 1px solid var(--border-color);
+            flex-wrap: wrap;
+        }
+
+        .filter-tab {
+            padding: 5px 10px;
+            cursor: pointer;
+            margin-right: 2px;
+            font-size: 13px;
+            border-radius: 3px;
+            transition: background-color 0.2s, color 0.2s;
+        }
+
+        .filter-tab.active {
+            background-color: var(--secondary-color);
+            color: var(--primary-dark);
+        }
+
+        .filter-tab:hover:not(.active) {
+            background-color: var(--primary-light);
+        }
+
+        .thumbnail-grid {
+            display: flex;
+            flex-wrap: wrap;
+            padding: 10px;
+            gap: 8px;
+        }
+
+        .thumbnail {
+            width: 90px;
+            height: 70px;
+            background-color: var(--primary-light);
+            border-radius: 4px;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .thumbnail:hover {
+            transform: scale(1.05);
+            border-color: var(--secondary-color);
+            box-shadow: 0 0 5px rgba(212, 175, 55, 0.5);
+        }
+
+        .thumbnail img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .thumbnail-label {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(13, 27, 42, 0.8);
+            font-size: 9px;
+            padding: 3px;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .thumbnail-type {
+            position: absolute;
+            top: 3px;
+            right: 3px;
+            background-color: var(--primary-dark);
+            color: var(--secondary-color);
+            font-size: 8px;
+            padding: 2px 4px;
+            border-radius: 2px;
+        }
+
+        .video-preview {
+            width: 100%;
+            height: calc(100% - 40px);
+            background-color: black;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        .video-preview::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle, transparent 40%, var(--primary-dark) 120%);
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .preview-content {
+            position: relative;
+            width: 640px;
+            height: 360px;
+            z-index: 2;
+        }
+
+        .preview-background {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-size: cover;
+            opacity: 0.3;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            padding: 8px;
+            background-color: var(--primary-light);
+            border-top: 1px solid var(--border-color);
+        }
+
+        .controls button {
+            background-color: var(--primary-color);
+            border: 1px solid var(--border-color);
+            color: var(--text-light);
+            width: 32px;
+            height: 32px;
+            margin: 0 5px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 16px;
+            border-radius: 3px;
+            transition: background-color 0.2s, color 0.2s;
+        }
+
+        .controls button:hover {
+            background-color: var(--secondary-color);
+            color: var(--primary-dark);
+        }
+
+        .playback-info {
+            display: flex;
+            align-items: center;
+            font-size: 12px;
+            margin: 0 10px;
+            background-color: var(--primary-color);
+            padding: 3px 10px;
+            border-radius: 3px;
+            border: 1px solid var(--border-color);
+        }
+
+        .timeline-toolbar {
+            background-color: var(--primary-dark);
+            padding: 6px;
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .timeline-toolbar button {
+            background-color: var(--primary-light);
+            border: 1px solid var(--border-color);
+            color: var(--text-light);
+            padding: 4px 8px;
+            margin: 0 2px;
+            cursor: pointer;
+            font-size: 14px;
+            border-radius: 3px;
+            transition: background-color 0.2s, color 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .timeline-toolbar button:hover {
+            background-color: var(--secondary-color);
+            color: var(--primary-dark);
+        }
+
+        .timeline-content {
+            height: 230px;
+            position: relative;
+            background: var(--panel-bg);
+        }
+
+        .timeline-ruler {
+            height: 20px;
+            background-color: var(--primary-dark);
+            position: relative;
+            left: 0;
+            right: 0;
+            display: flex;
+            font-size: 10px;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--secondary-color);
+        }
+
+        .timeline-ruler div {
+            width: 100px;
+            text-align: center;
+            border-right: 1px solid var(--border-color);
+            padding-top: 3px;
+        }
+
+        .timeline-track {
+            height: 50px;
+            margin: 2px 0;
+            background-color: var(--panel-bg);
+            position: relative;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .track-label {
+            width: 70px;
+            height: 50px;
+            background-color: var(--primary-dark);
+            position: absolute;
+            left: 0;
+            top: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            border-right: 1px solid var(--border-color);
+            color: var(--secondary-color);
+        }
+
+        .track-content {
+            margin-left: 70px;
+            height: 100%;
+            position: relative;
+        }
+
+        .timeline-clip {
+            position: absolute;
+            top: 5px;
+            height: 40px;
+            border-radius: 3px;
+            cursor: move;
+            border: 1px solid rgba(0, 0, 0, 0.2);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .timeline-clip:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .clip-video {
+            background: linear-gradient(to bottom, var(--secondary-color), var(--secondary-dark));
+        }
+
+        .clip-audio {
+            background: linear-gradient(to bottom, var(--transcribe-accent), #7323ca);
+        }
+
+        .clip-title {
+            background: linear-gradient(to bottom, var(--accent-color), var(--accent-dark));
+        }
+
+        .clip-effect {
+            background: linear-gradient(to bottom, var(--accent-light), var(--accent-color));
+        }
+
+        .clip-default {
+            background: linear-gradient(to bottom, var(--primary-light), var(--primary-color));
+        }
+
+        .timeline-playhead {
+            position: absolute;
+            top: 0;
+            width: 2px;
+            height: 100%;
+            background-color: var(--accent-color);
+            z-index: 10;
+            box-shadow: 0 0 5px rgba(164, 22, 26, 0.5);
+        }
+
+        .clip-thumbnail {
+            height: 100%;
+            width: 30px;
+            background-size: cover;
+            border-right: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .clip-content {
+            display: flex;
+            height: 100%;
+            align-items: center;
+        }
+
+        .clip-label {
+            padding: 0 5px;
+            font-size: 10px;
+            white-space: nowrap;
+            overflow: hidden;
+            color: var(--text-light);
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        }
+
+        .preview-img {
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        /* Drop Zone Styling */
+        .drop-zone {
+            border: 2px dashed var(--border-color);
+            border-radius: 12px;
+            padding: 25px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background-color: var(--primary-light);
+            margin: 10px;
+        }
+        
+        .drop-zone:hover {
+            border-color: var(--secondary-color);
+            background-color: rgba(212, 175, 55, 0.05);
+        }
+        
+        .drop-zone.dragover {
+            border-color: var(--secondary-color);
+            background-color: rgba(212, 175, 55, 0.1);
+            transform: scale(1.02);
+            box-shadow: 0 5px 15px rgba(212, 175, 55, 0.2);
+        }
+
+        /* Dialog styling */
+        .dialog-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .dialog-modal {
+            background: var(--panel-bg);
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+            width: 550px;
+            max-width: 90%;
+            overflow: hidden;
+            border: 2px solid var(--secondary-color);
+        }
+
+        .dialog-header {
+            background: var(--panel-header);
+            padding: 10px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: var(--secondary-color);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .dialog-content {
+            padding: 20px;
+        }
+
+        .dialog-actions {
+            padding: 10px 15px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            background: var(--primary-dark);
+            border-top: 1px solid var(--border-color);
+        }
+
+        .dialog-btn {
+            padding: 6px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            border: none;
+            font-weight: 500;
+        }
+
+        .btn-primary {
+            background: var(--secondary-color);
+            color: var(--primary-dark);
+        }
+
+        .btn-cancel {
+            background: var(--primary-light);
+            color: var(--text-light);
+            border: 1px solid var(--border-color);
+        }
+        
+        /* Progress Bar */
+        .progress-container {
+            width: 100%;
+            background-color: var(--primary-dark);
+            border-radius: 4px;
+            margin: 15px 0;
+            overflow: hidden;
+        }
+        
+        .progress-bar {
+            height: 10px;
+            background-color: var(--secondary-color);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        
+        /* Timer indicator */
+        .timer-indicator {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            z-index: 1000;
+            border: 1px solid var(--secondary-color);
+        }
+        
+        /* Video-specific controls */
+        .video-controls {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            background-color: var(--primary-dark);
+            border-radius: 5px;
+            margin: 10px;
+        }
+        
+        .time-input {
+            background-color: var(--primary-light);
+            border: 1px solid var(--border-color);
+            color: var(--text-light);
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-family: monospace;
+            width: 100px;
+        }
+        
+        /* Mobile responsiveness */
+        @media (max-width: 1200px) {
+            .main-container {
+                flex-direction: column;
+                height: auto;
+            }
+            
+            .preview-panel {
+                order: -1;
+                margin-bottom: 10px;
+            }
+            
+            .properties-panel, .project-files, .effects-panel {
+                width: 100%;
+                max-width: none;
+                margin-bottom: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="timer-indicator">
+        Ready
+    </div>
+
+    <div class="menu-bar">
+        <div class="app-logo">
+            <i class="fas fa-photo-film" style="color: var(--secondary-color); margin-right: 5px;"></i>
+            MosaicMaster
+        </div>
+        <div class="menu-item"><i class="fas fa-file fa-sm" style="margin-right: 5px;"></i>Fájl</div>
+        <div class="menu-item"><i class="fas fa-edit fa-sm" style="margin-right: 5px;"></i>Szerkesztés</div>
+        <div class="menu-item"><i class="fas fa-heading fa-sm" style="margin-right: 5px;"></i>Címfeliratok</div>
+        <div class="menu-item"><i class="fas fa-image fa-sm" style="margin-right: 5px;"></i>Effektek</div>
+        <div class="menu-item" id="settingsMenuButton"><i class="fas fa-sliders fa-sm" style="margin-right: 5px;"></i>Beállítások</div>
+        <div class="menu-item" id="helpMenuButton"><i class="fas fa-question-circle fa-sm" style="margin-right: 5px;"></i>Súgó</div>
+    </div>
+    
+    <div class="navbar">
+        <div class="toolbar-group">
+            <button title="Új projekt"><i class="fas fa-file"></i></button>
+            <button title="Projekt megnyitása"><i class="fas fa-folder-open"></i></button>
+            <button title="Projekt mentése"><i class="fas fa-save"></i></button>
+        </div>
+        
+        <div class="toolbar-group">
+            <button title="Médiafájl importálása" id="importMediaBtn"><i class="fas fa-file-import"></i></button>
+            <button title="Videó exportálása" id="exportVideoBtn"><i class="fas fa-file-export"></i></button>
+            <button title="Közvetlen feltöltés"><i class="fas fa-cloud-upload-alt"></i></button>
+        </div>
+        
+        <!-- Fő fül navigáció -->
+        <div class="toolbar-group module-tabs">
+            <button title="Vágás" class="tab-button active" data-tab="trim"><i class="fas fa-cut"></i> Vágás</button>
+            <button title="Feliratok" class="tab-button" data-tab="subtitles"><i class="fas fa-closed-captioning"></i> Feliratok</button>
+            <button title="Effektek" class="tab-button" data-tab="effects"><i class="fas fa-magic"></i> Effektek</button>
+            <button title="Beállítások" class="tab-button" data-tab="settings"><i class="fas fa-cog"></i> Beállítások</button>
+        </div>
+        
+        <div class="toolbar-group">
+            <button title="Lejátszás/Szünet"><i class="fas fa-play"></i></button>
+            <button title="Leállítás"><i class="fas fa-stop"></i></button>
+            <button title="Képkocka visszalépés"><i class="fas fa-step-backward"></i></button>
+            <button title="Képkocka előrelépés"><i class="fas fa-step-forward"></i></button>
+        </div>
+        
+        <div class="navbar-spacer"></div>
+        
+        <div class="status-indicator">
+            <div class="status-dot"></div>
+            <span id="projectInfo">Nincs aktív projekt</span>
+        </div>
+    </div>
+
+    <div class="main-container" id="editorContainer">
+        <div id="videoUploadContainer" class="panel properties-panel">
+            <div class="header">
+                <span><i class="fas fa-upload" style="margin-right: 5px;"></i>Videó Feltöltés</span>
+                <div class="header-controls">
+                    <div class="collapse-btn">-</div>
+                </div>
+            </div>
+            <div id="videoDropZone" class="drop-zone">
+                <input type="file" id="videoFileInput" style="display: none;" accept="video/*,.avi,.mkv,.mov,.flv,.wmv,.mp4,.webm,.ogg">
+                <i class="fas fa-cloud-upload-alt" style="font-size: 48px; color: var(--secondary-color); margin-bottom: 10px;"></i>
+                <p style="font-size: 18px;">Húzza ide a videót vagy kattintson a feltöltéshez</p>
+                <p style="font-size: 14px; opacity: 0.7;">Támogatott formátumok: MP4, WebM, AVI, MOV, MKV, OGG, FLV, WMV</p>
+            </div>
+        </div>
+        <div class="panel properties-panel module-panel" id="trim-panel">
+            <div class="header">
+                <span><i class="fas fa-sliders-h" style="margin-right: 5px;"></i>Tulajdonságok</span>
+                <div class="header-controls">
+                    <div class="collapse-btn">-</div>
+                </div>
+            </div>
+            <div class="property-table">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tr>
+                        <th style="text-align: left; width: 100px; padding: 5px;">Videó:</th>
+                        <td style="padding: 5px;">
+                            <select id="videoSelector" style="width: 100%;">
+                                <option value="active">Aktív videó</option>
+                            </select>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+            <div style="display: flex; flex-wrap: wrap;">
+                <div style="flex: 1; min-width: 110px;">
+                    <div class="property-row">
+                        <div class="property-name">Vágás kezdete</div>
+                        <div class="property-value">
+                            <input type="text" id="startTimeInput" class="time-input" value="00:00:00" style="width: 100%;">
+                        </div>
+                    </div>
+                    <div class="property-row">
+                        <div class="property-name">Vágás vége</div>
+                        <div class="property-value">
+                            <input type="text" id="endTimeInput" class="time-input" value="00:00:00" style="width: 100%;">
+                        </div>
+                    </div>
+                    <div class="property-row">
+                        <div class="property-name">Kimeneti formátum</div>
+                        <div class="property-value">
+                            <select id="outputFormat" style="width: 100%; background-color: var(--primary-light); border: 1px solid var(--border-color); color: var(--text-light); padding: 3px; border-radius: 3px;">
+                                <option value="mp4">MP4</option>
+                                <option value="webm">WebM</option>
+                                <option value="mov">MOV</option>
+                                <option value="avi">AVI</option>
+                                <option value="mkv">MKV</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="header" style="margin-top: 10px; background-color: var(--primary-light);">
+                <span><i class="fas fa-cog" style="margin-right: 5px;"></i>Speciális Beállítások</span>
+            </div>
+            <div style="padding: 10px;">
+                <div class="property-row">
+                    <div class="property-name">Minőség</div>
+                    <div class="property-value">
+                        <div class="slider-container">
+                            <input type="range" id="qualitySlider" min="0" max="100" step="1" value="80" style="width: 100%">
+                        </div>
+                        <span id="qualityValue" style="min-width: 35px; text-align: right;">80%</span>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; margin-top: 10px;">
+                    <input type="checkbox" id="extractAudio" style="margin-right: 5px;">
+                    <label for="extractAudio">Hang kinyerése</label>
+                </div>
+                <div style="display: flex; align-items: center; margin-top: 10px;">
+                    <input type="checkbox" id="preserveSubtitles" style="margin-right: 5px;">
+                    <label for="preserveSubtitles">Feliratok megőrzése (ha van)</label>
+                </div>
+                
+                <div style="display: flex; align-items: center; margin-top: 10px;">
+                    <input type="checkbox" id="previewSelection" style="margin-right: 5px;" checked>
+                    <label for="previewSelection">Csak a kijelölt részt játssza le</label>
+                </div>
+                <button id="executeVideoBtn" style="width: 100%; margin-top: 15px; background-color: var(--secondary-color); color: var(--primary-dark); padding: 8px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                    <i class="fas fa-scissors" style="margin-right: 5px;"></i> Vágás Végrehajtása
+                </button>
+            </div>
+        </div>
+        
+        <div class="panel preview-panel">
+            <div class="header">
+                <span><i class="fas fa-tv" style="margin-right: 5px;"></i>Előnézet</span>
+                <div class="header-controls">
+                    <button title="Teljes képernyő" style="background: transparent; border: none; color: var(--text-light); cursor: pointer; font-size: 14px;"><i class="fas fa-expand"></i></button>
+                    <div class="collapse-btn">-</div>
+                </div>
+            </div>
+            <div class="video-preview" id="videoContainer">
+                <div id="video-container" class="preview-content">
+                    <!-- Replace Video.js player with Plyr -->
+                    <video 
+                        id="videoPlayer" 
+                        controls 
+                        crossorigin 
+                        playsinline
+                        poster="/static/video_placeholder.jpg">
+                        <!-- Sources will be set dynamically by JavaScript -->
+                        <!-- We're using Video.js which has broader codec support than native HTML5 -->
+                        <!-- MKV files will be handled by Video.js's advanced playback capabilities -->
+                        <p class="vjs-no-js">
+                            Az Ön böngészője nem támogatja a JavaScript-et, vagy ki van kapcsolva. Kapcsolja be a JavaScript-et vagy használjon modern böngészőt.
+                        </p>
+                    </video>
+                </div>
+            </div>
+            <div class="controls">
+                <button title="Első képkocka" id="firstFrameBtn"><i class="fas fa-fast-backward"></i></button>
+                <button title="Előző képkocka" id="prevFrameBtn"><i class="fas fa-step-backward"></i></button>
+                <button title="Lejátszás/Szünet" id="playPauseBtn"><i class="fas fa-play"></i></button>
+                <button title="Következő képkocka" id="nextFrameBtn"><i class="fas fa-step-forward"></i></button>
+                <button title="Utolsó képkocka" id="lastFrameBtn"><i class="fas fa-fast-forward"></i></button>
+                
+                <div class="playback-info" id="playbackInfo">
+                    00:00:00 / 00:00:00
+                </div>
+                
+                <button title="Kezdőpont beállítása" id="setStartBtn"><i class="fas fa-chevron-left"></i></button>
+                <button title="Végpont beállítása" id="setEndBtn"><i class="fas fa-chevron-right"></i></button>
+            </div>
+        </div>
+        
+        <div class="panel effects-panel module-panel" id="effects-panel" style="display: none;">
+            <div class="header">
+                <span><i class="fas fa-magic" style="margin-right: 5px;"></i>Effektek</span>
+                <div class="collapse-btn">-</div>
+            </div>
+            <div class="panel-content">
+                <div class="property-row">
+                    <div class="property-name">Effekt típusa</div>
+                    <div class="property-value">
+                        <select id="effectType" style="width: 100%; background-color: var(--primary-light); border: 1px solid var(--border-color); color: var(--text-light); padding: 3px; border-radius: 3px;">
+                            <option value="none">Nincs</option>
+                            <option value="grayscale">Fekete-fehér</option>
+                            <option value="sepia">Szépia</option>
+                            <option value="vignette">Vignetta</option>
+                            <option value="blur">Elmosás</option>
+                            <option value="sharpen">Élesítés</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="property-row">
+                    <div class="property-name">Forgatás</div>
+                    <div class="property-value">
+                        <select id="rotationAngle" style="width: 100%; background-color: var(--primary-light); border: 1px solid var(--border-color); color: var(--text-light); padding: 3px; border-radius: 3px;">
+                            <option value="0">Nincs forgatás</option>
+                            <option value="90">90 fok jobbra</option>
+                            <option value="180">180 fok</option>
+                            <option value="270">90 fok balra</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="property-row">
+                    <div style="display: flex; align-items: center; margin-top: 5px;">
+                        <input type="checkbox" id="flipHorizontal" style="margin-right: 5px;">
+                        <label for="flipHorizontal">Vízszintes tükrözés</label>
+                    </div>
+                </div>
+                <div class="property-row">
+                    <div style="display: flex; align-items: center; margin-top: 5px;">
+                        <input type="checkbox" id="flipVertical" style="margin-right: 5px;">
+                        <label for="flipVertical">Függőleges tükrözés</label>
+                    </div>
+                </div>
+                <div class="property-row">
+                    <div class="property-name">Kimeneti formátum</div>
+                    <div class="property-value">
+                        <select id="effectsOutputFormat" style="width: 100%; background-color: var(--primary-light); border: 1px solid var(--border-color); color: var(--text-light); padding: 3px; border-radius: 3px;">
+                            <option value="mp4">MP4</option>
+                            <option value="webm">WebM</option>
+                            <option value="mkv">MKV</option>
+                        </select>
+                    </div>
+                </div>
+                <button id="applyEffectsBtn" style="width: 100%; margin-top: 15px; background-color: var(--secondary-color); color: var(--primary-dark); padding: 8px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                    <i class="fas fa-magic" style="margin-right: 5px;"></i> Effektek Alkalmazása
+                </button>
+            </div>
+        </div>
+            
+        <div class="panel subtitles-panel module-panel" id="subtitles-panel" style="display: block;">
+            <div class="header">
+                <span><i class="fas fa-closed-captioning" style="margin-right: 5px;"></i>Feliratok</span>
+                <div class="header-controls">
+                    <div class="collapse-btn">-</div>
+                </div>
+            </div>
+            <div class="panel-content">
+                <div style="padding: 10px; background-color: var(--primary-dark); border-radius: 4px; margin-bottom: 10px;">
+                    <h4 style="margin-top: 0; margin-bottom: 5px;">Felirat műveletek</h4>
+                    <p style="font-size: 12px; margin: 0;">Adjon hozzá feliratot a videóhoz vagy égesse be közvetlenül a képbe.</p>
+                </div>
+            
+                <div id="subtitleDropZone" class="file-drop-zone" style="margin-bottom: 10px;" onclick="document.getElementById('subtitleFileInput').click()">
+                    <input type="file" id="subtitleFileInput" accept=".srt,.vtt,.ass,.ssa" style="display:none;" onchange="handleSubtitleFileUpload(this.files[0])">
+                    <div class="upload-icon"><i class="fas fa-file-upload"></i></div>
+                    <div class="upload-text">Felirat fájl feltöltése<br>(.srt, .vtt, .ass, .ssa)</div>
+                </div>
+                <div id="subtitleFileInfo" class="file-info hidden" style="margin-bottom: 10px; padding: 10px; background-color: var(--primary-light); border-radius: 4px;">
+                    <div class="file-name-section" style="display: flex; justify-content: space-between; align-items: center;">
+                        <span id="subtitleFileName">filename.srt</span>
+                        <button id="removeSubtitleFile" class="remove-file-btn" style="background: none; border: none; color: var(--accent-color); cursor: pointer;"><i class="fas fa-times"></i></button>
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                    <button id="applySubtitleBtn" style="flex: 1; padding: 8px; background-color: var(--secondary-color); color: var(--primary-dark); border: none; border-radius: 4px; cursor: pointer; font-weight: bold;" onclick="ProcessingModule.applySubtitle()">
+                        <i class="fas fa-plus-circle" style="margin-right: 5px;"></i> Felirat Hozzáadása
+                    </button>
+                    <button id="burnSubtitleBtn" style="flex: 1; padding: 8px; background-color: var(--accent-color); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;" onclick="ProcessingModule.burnSubtitle()">
+                        <i class="fas fa-fire" style="margin-right: 5px;"></i> Felirat Beégetése
+                    </button>
+                </div>
+                
+                <div class="property-section" style="border-top: 1px solid var(--border-color); padding-top: 10px; margin-top: 10px;">
+                    <h4 style="margin-top: 0; margin-bottom: 10px;">Felirat beállítások</h4>
+                    
+                    <div class="property-row">
+                        <div class="property-name">Nyelv</div>
+                        <div class="property-value">
+                            <select id="subtitleLanguage" style="width: 100%; background-color: var(--primary-light); border: 1px solid var(--border-color); color: var(--text-light); padding: 3px; border-radius: 3px;">
+                                <option value="hun">Magyar</option>
+                                <option value="eng">Angol</option>
+                                <option value="deu">Német</option>
+                                <option value="fra">Francia</option>
+                                <option value="spa">Spanyol</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="property-row">
+                        <div class="property-name">Késleltetés (mp)</div>
+                        <div class="property-value">
+                            <input type="number" id="subtitleDelay" min="-15" max="15" step="0.1" value="0" style="width: 100%; background-color: var(--primary-light); border: 1px solid var(--border-color); color: var(--text-light); padding: 3px; border-radius: 3px;">
+                        </div>
+                    </div>
+                    
+                    <div class="property-row">
+                        <div class="property-name">Betűméret</div>
+                        <div class="property-value">
+                            <input type="range" id="subtitleFontSize" min="12" max="48" value="24" style="width: 80%; background-color: var(--primary-light);">
+                            <span id="subtitleFontSizeValue" style="margin-left: 8px;">24px</span>
+                        </div>
+                    </div>
+                    
+                    <div class="property-row">
+                        <div class="property-name">Szín</div>
+                        <div class="property-value">
+                            <select id="subtitleColor" style="width: 100%; background-color: var(--primary-light); border: 1px solid var(--border-color); color: var(--text-light); padding: 3px; border-radius: 3px;">
+                                <option value="white">Fehér</option>
+                                <option value="yellow">Sárga</option>
+                                <option value="cyan">Cián</option>
+                                <option value="lime">Zöld</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="property-row">
+                        <div style="display: flex; align-items: center;">
+                            <input type="checkbox" id="subtitleOutline" checked style="margin-right: 5px;">
+                            <label for="subtitleOutline">Körvonal</label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="property-row">
+                    <div class="property-name">Formátum</div>
+                    <div class="property-value">
+                        <select id="subtitleFormat" style="width: 100%; background-color: var(--primary-light); border: 1px solid var(--border-color); color: var(--text-light); padding: 3px; border-radius: 3px;">
+                            <option value="srt">SRT</option>
+                            <option value="vtt">VTT</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div id="processingSection" class="hidden" style="margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 10px; position: relative;">
+                    <button id="stopProcessingBtn" style="position: absolute; right: 0; top: 0; background-color: var(--accent-color); color: white; border: none; border-radius: 4px; width: 30px; height: 30px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-stop"></i>
+                    </button>
+                    <h4 style="margin: 0 0 8px 0;">Feldolgozás...</h4>
+                    <div class="progress-container" style="background-color: var(--primary-dark); height: 12px; border-radius: 6px; overflow: hidden;">
+                        <div id="progressBar" class="progress-bar" style="height: 100%; width: 0%; background-color: var(--secondary-color);"></div>
+                    </div>
+                    <div id="statusText" style="font-size: 12px; margin-top: 5px; text-align: center;">Előkészítés...</div>
+                    <button id="downloadSubtitlesBtn" class="hidden" style="width: 100%; margin-top: 10px; background-color: var(--accent-color); color: var(--text-light); padding: 6px; border: none; border-radius: 4px; cursor: pointer;">
+                        Letöltés
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Timeline section -->
+    <div class="timeline" id="timelineContainer" style="margin-top: 10px;">
+        <div class="header">
+            <span><i class="fas fa-film" style="margin-right: 5px;"></i>Idővonal</span>
+            <div class="header-controls">
+                <button title="Zoom be" id="zoomInBtn" style="background: transparent; border: none; color: var(--text-light); cursor: pointer; font-size: 14px;"><i class="fas fa-search-plus"></i></button>
+                <button title="Zoom ki" id="zoomOutBtn" style="background: transparent; border: none; color: var(--text-light); cursor: pointer; font-size: 14px;"><i class="fas fa-search-minus"></i></button>
+                <div class="collapse-btn">-</div>
+            </div>
+        </div>
+        <div class="timeline-toolbar">
+            <button title="Sáv hozzáadása"><i class="fas fa-plus"></i> Sáv</button>
+            <button title="Sáv törlése"><i class="fas fa-trash-alt"></i> Sáv</button>
+            <button title="Kivágás"><i class="fas fa-cut"></i> Vágás</button>
+            <button title="Illesztés"><i class="fas fa-magnet"></i> Snap</button>
+            <button title="Marker hozzáadása"><i class="fas fa-plus"></i> Marker</button>
+        </div>
+        <div class="timeline-content">
+            <div class="timeline-ruler" id="timelineRuler">
+                <!-- Time markings will be generated dynamically -->
+            </div>
+            
+            <!-- Timeline for visualizing and selecting video segments -->
+            <div id="videoTimeline" class="video-timeline" style="position: relative; height: 30px; background-color: var(--primary-dark); margin-bottom: 10px; cursor: pointer;">
+                <div id="timeMarkings" class="time-markings"></div>
+                <div id="timelineMarker" class="timeline-marker" style="left: 0%;" title="Aktuális lejátszási pozíció"></div>
+                
+                <!-- Current Position Label -->
+                <div id="currentPositionIndicator" class="current-position-indicator" style="position: absolute; top: -20px; left: 0%; transform: translateX(-50%); font-size: 11px; background-color: var(--accent-color); color: white; padding: 2px 4px; border-radius: 3px; z-index: 11; white-space: nowrap;">00:00:00</div>
+            </div>
+            
+            <!-- New trim controls layout -->
+            <div class="trim-controls" style="position: relative; margin-top: 10px; height: 50px;">
+                <!-- Trim region bar -->
+                <div id="trimRegion" class="trim-region" style="position: absolute; left: 0%; width: 100%; top: 15px; z-index: 10;">
+                </div>
+                
+                <!-- Left Handle -->
+                <div id="leftTrimHandle" class="trim-handle" style="position: absolute; left: 0%; top: 0px; z-index: 20; width: 20px; height: 30px; margin-left: -10px; background-color: var(--secondary-color); border-radius: 4px; cursor: ew-resize !important; display: flex; align-items: center; justify-content: center;">
+                    <div style="width: 2px; height: 12px; background-color: var(--primary-dark); margin-right: 5px;"></div>
+                    <div style="width: 2px; height: 12px; background-color: var(--primary-dark);"></div>
+                    <div id="leftHandleLabel" style="position: absolute; top: -25px; left: 50%; transform: translateX(-50%); font-size: 11px; background-color: var(--primary-dark); color: var(--secondary-color); padding: 2px 4px; border-radius: 3px; white-space: nowrap; border: 1px solid var(--secondary-color);">00:00:00</div>
+                </div>
+                
+                <!-- Right Handle -->
+                <div id="rightTrimHandle" class="trim-handle" style="position: absolute; right: 0%; top: 0px; z-index: 25; width: 20px; height: 30px; margin-right: -10px; background-color: #4CAF50; border-radius: 4px; cursor: ew-resize !important; display: flex; align-items: center; justify-content: center;">
+                    <div style="width: 2px; height: 12px; background-color: var(--primary-dark); margin-right: 5px;"></div>
+                    <div style="width: 2px; height: 12px; background-color: var(--primary-dark);"></div>
+                    <div id="rightHandleLabel" style="position: absolute; top: -25px; left: 50%; transform: translateX(-50%); font-size: 11px; background-color: var(--primary-dark); color: var(--secondary-color); padding: 2px 4px; border-radius: 3px; white-space: nowrap; border: 1px solid var(--secondary-color);">00:00:00</div>
+                </div>
+            </div>
+            <!-- No longer needed since we're using the marker in videoTimeline -->
+            <!-- <div class="timeline-playhead" id="timelinePlayhead" style="left: 0px;"></div> -->
+            
+            <div class="timeline-track">
+                <div class="track-label">Videó</div>
+                <div class="track-content" id="videoTrack">
+                    <!-- Clips will be added dynamically -->
+                </div>
+            </div>
+            
+            <div class="timeline-track">
+                <div class="track-label">Hang</div>
+                <div class="track-content" id="audioTrack">
+                    <!-- Audio clips will be added dynamically -->
+                </div>
+            </div>
+            
+            <div class="timeline-track">
+                <div class="track-label">Felirat</div>
+                <div class="track-content" id="subtitleTrack">
+                    <!-- Subtitle clips will be added dynamically -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Processing Progress Dialog -->
+    <div class="dialog-overlay" id="processingDialog" style="display: none;">
+        <div class="dialog-modal">
+            <div class="dialog-header">
+                <span><i class="fas fa-cog fa-spin"></i> Videó Feldolgozása</span>
+            </div>
+            <div class="dialog-content">
+                <p>A videó feldolgozása folyamatban van. Kérjük várjon...</p>
+                <div class="progress-container">
+                    <div class="progress-bar" id="progressBar"></div>
+                </div>
+                <p id="processingStatus">Előkészítés...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Success Dialog -->
+    <div class="dialog-overlay" id="successDialog" style="display: none;">
+        <div class="dialog-modal">
+            <div class="dialog-header">
+                <span><i class="fas fa-check-circle"></i> Sikeres Művelet</span>
+                <i class="fas fa-times" style="cursor: pointer;" id="closeSuccessDialog"></i>
+            </div>
+            <div class="dialog-content">
+                <p>A videó feldolgozása sikeresen befejeződött!</p>
+                <p id="successMessage">A feldolgozott videót letöltheti vagy folytathatja a szerkesztést.</p>
+            </div>
+            <div class="dialog-actions">
+                <button class="dialog-btn btn-cancel" id="continueEditingBtn">Szerkesztés Folytatása</button>
+                <button class="dialog-btn btn-primary" id="downloadVideoBtn">Letöltés</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modular JavaScript files -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="/static/subtitles.js"></script>
+    <!-- New modular architecture -->
+    <script src="/static/js/videoeditor/modules/ui.js"></script>
+    <script src="/static/js/videoeditor/modules/video.js"></script>
+    <script src="/static/js/videoeditor/modules/timer.js"></script>
+    <script src="/static/js/videoeditor/modules/processing.js"></script>
+    <script src="/static/js/videoeditor/modules/main.js"></script>
+    <!-- Legacy scripts for backward compatibility -->
+    <!-- <script src="/static/js/videoeditor/core.js"></script> -->
+    <!-- <script src="/static/js/videoeditor/trimmodule.js"></script> -->
+    
+    <script>
+        // Global variables
+        let currentVideoFile = null;
+        let videoDuration = 0;
+        let startTime = 0;
+        let endTime = 0;
+        let connectionId = crypto.randomUUID();
+
+        // Make videoFile and other variables available to other modules
+        window.getVideoFile = function() {
+            return currentVideoFile;
+        };
+        
+        // Expose key variables to global scope for modules to access
+        window.currentVideoFile = currentVideoFile;
+        window.videoDuration = videoDuration;
+        window.startTime = startTime;
+        window.endTime = endTime;
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log("MosaicMaster Video Editor Initialized");
+            
+            // Set globals for modules to access
+            window.currentVideoFile = currentVideoFile;
+            window.videoDuration = videoDuration;
+            window.startTime = startTime;
+            window.endTime = endTime;
+            
+            // Expose function for subtitles.js
+            window.getVideoFile = function() {
+                return currentVideoFile;
+            };
+            
+            // Direct simple video file handler
+            const videoFileInput = document.getElementById('videoFileInput');
+            const videoDropZone = document.getElementById('videoDropZone');
+            const videoPlayer = document.getElementById('videoPlayer');
+            
+            // Simple file handler function for both drop and input
+            function handleVideoFile(file) {
+                console.log("Direct file handler called:", file.name);
+                if (file.type.startsWith('video/') || file.name.endsWith('.mp4') || file.name.endsWith('.webm')) {
+                    const videoURL = URL.createObjectURL(file);
+                    videoPlayer.src = videoURL;
+                    videoPlayer.load();
+                    
+                    // Store file globally
+                    currentVideoFile = file;
+                    window.currentVideoFile = file;
+                    
+                    // Show the subtitle panel
+                    const subtitlesPanel = document.getElementById('subtitles-panel');
+                    if (subtitlesPanel) {
+                        subtitlesPanel.style.display = 'block';
+                    }
+                    
+                    // Update interface elements
+                    const videoFileName = document.getElementById('videoFileName');
+                    if (videoFileName) videoFileName.textContent = file.name;
+                    
+                    const projectInfo = document.getElementById('projectInfo');
+                    if (projectInfo) projectInfo.textContent = file.name;
+                    
+                    // Enable elements that should be visible when video is loaded
+                    document.querySelectorAll('.hidden').forEach(el => {
+                        el.classList.remove('hidden');
+                    });
+                } else {
+                    alert('Csak videó fájlokat tölthet fel.');
+                }
+            }
+            
+            if (videoFileInput) {
+                videoFileInput.addEventListener('change', function(e) {
+                    if (e.target.files.length > 0) {
+                        handleVideoFile(e.target.files[0]);
+                    }
+                });
+            }
+            
+            if (videoDropZone) {
+                videoDropZone.addEventListener('drop', function(e) {
+                    e.preventDefault();
+                    videoDropZone.classList.remove('dragover');
+                    if (e.dataTransfer.files.length > 0) {
+                        handleVideoFile(e.dataTransfer.files[0]);
+                    }
+                });
+                
+                videoDropZone.addEventListener('dragover', function(e) {
+                    e.preventDefault();
+                    videoDropZone.classList.add('dragover');
+                });
+                
+                videoDropZone.addEventListener('dragleave', function() {
+                    videoDropZone.classList.remove('dragover');
+                });
+                
+                videoDropZone.addEventListener('click', function() {
+                    videoFileInput.click();
+                });
+            }
+            
+            // Other elements we need to access
+            const videoUploadContainer = document.getElementById('videoUploadContainer');
+            const editorContainer = document.getElementById('editorContainer');
+            const timelineContainer = document.getElementById('timelineContainer');
+            const videoPlayer = document.getElementById('videoPlayer');
+            const playPauseBtn = document.getElementById('playPauseBtn');
+            const playbackInfo = document.getElementById('playbackInfo');
+            const startTimeInput = document.getElementById('startTimeInput');
+            const endTimeInput = document.getElementById('endTimeInput');
+            const setStartBtn = document.getElementById('setStartBtn');
+            const setEndBtn = document.getElementById('setEndBtn');
+            const qualitySlider = document.getElementById('qualitySlider');
+            const qualityValue = document.getElementById('qualityValue');
+            const fontSizeSlider = document.getElementById('fontSizeSlider');
+            const fontSizeValue = document.getElementById('fontSizeValue');
+            const executeVideoBtn = document.getElementById('executeVideoBtn');
+            const processingDialog = document.getElementById('processingDialog');
+            const progressBar = document.getElementById('progressBar');
+            const processingStatus = document.getElementById('processingStatus');
+            const successDialog = document.getElementById('successDialog');
+            const closeSuccessDialog = document.getElementById('closeSuccessDialog');
+            const continueEditingBtn = document.getElementById('continueEditingBtn');
+            const downloadVideoBtn = document.getElementById('downloadVideoBtn');
+            const timelinePlayhead = document.getElementById('timelinePlayhead');
+            const projectInfo = document.getElementById('projectInfo');
+            const timelineRuler = document.getElementById('timelineRuler');
+            const firstFrameBtn = document.getElementById('firstFrameBtn');
+            const prevFrameBtn = document.getElementById('prevFrameBtn');
+            const nextFrameBtn = document.getElementById('nextFrameBtn');
+            const lastFrameBtn = document.getElementById('lastFrameBtn');
+            const timerIndicator = document.querySelector('.timer-indicator');
+            
+            // File upload handling
+            videoDropZone.addEventListener('click', () => {
+                videoFileInput.click();
+            });
+            
+            videoDropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                videoDropZone.classList.add('dragover');
+            });
+            
+            videoDropZone.addEventListener('dragleave', () => {
+                videoDropZone.classList.remove('dragover');
+            });
+            
+            videoDropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                videoDropZone.classList.remove('dragover');
+                
+                if (e.dataTransfer.files.length) {
+                    handleFileUpload(e.dataTransfer.files[0]);
+                }
+            });
+            
+            videoFileInput.addEventListener('change', () => {
+                if (videoFileInput.files.length) {
+                    handleFileUpload(videoFileInput.files[0]);
+                }
+            });
+            
+            function handleFileUpload(file) {
+                // Check if it's a video file
+                if (!file.type.startsWith('video/')) {
+                    alert('Kérjük csak videó fájlokat töltsön fel.');
+                    return;
+                }
+                
+                currentVideoFile = file;
+                
+                // Create a URL for the video
+                const videoURL = URL.createObjectURL(file);
+                videoPlayer.src = videoURL;
+                
+                // Update panel UI
+                if (videoUploadContainer) {
+                    const uploadHeader = videoUploadContainer.querySelector('.header');
+                    if (uploadHeader) {
+                        uploadHeader.innerHTML = `<span><i class="fas fa-file-video" style="margin-right: 5px;"></i>${file.name}</span>
+                        <div class="header-controls">
+                            <div class="collapse-btn">-</div>
+                        </div>`;
+                    }
+                }
+                
+                // Show timeline
+                if (timelineContainer) {
+                    timelineContainer.style.display = 'block';
+                }
+                
+                // Update project info
+                projectInfo.textContent = `${file.name} - ${formatFileSize(file.size)}`;
+                
+                // Setup video metadata
+                videoPlayer.onloadedmetadata = () => {
+                    videoDuration = videoPlayer.duration;
+                    endTime = videoDuration;
+                    
+                    startTimeInput.value = formatTime(0);
+                    endTimeInput.value = formatTime(videoDuration);
+                    
+                    updatePlaybackInfo();
+                    createTimelineRuler();
+                    createVideoClip();
+                };
+                
+                timerIndicator.textContent = 'Videó betöltve';
+            }
+            
+            // Video playback controls - panel icons és toolbar buttons is
+            function setupPlaybackControls() {
+                // Bottom panel controls
+                if (playPauseBtn) {
+                    playPauseBtn.addEventListener('click', togglePlayPause);
+                }
+                
+                if (firstFrameBtn) {
+                    firstFrameBtn.addEventListener('click', () => {
+                        if (!videoPlayer || !videoPlayer.src) return;
+                        videoPlayer.currentTime = 0;
+                        updatePlaybackInfo();
+                        updateTimelinePlayhead();
+                    });
+                }
+                
+                if (lastFrameBtn) {
+                    lastFrameBtn.addEventListener('click', () => {
+                        if (!videoPlayer || !videoPlayer.src || videoDuration <= 0) return;
+                        videoPlayer.currentTime = videoDuration;
+                        updatePlaybackInfo();
+                        updateTimelinePlayhead();
+                    });
+                }
+                
+                if (prevFrameBtn) {
+                    prevFrameBtn.addEventListener('click', () => {
+                        if (!videoPlayer || !videoPlayer.src) return;
+                        videoPlayer.currentTime = Math.max(0, videoPlayer.currentTime - 0.033); // Approx 1 frame at 30fps
+                        updatePlaybackInfo();
+                        updateTimelinePlayhead();
+                    });
+                }
+                
+                if (nextFrameBtn) {
+                    nextFrameBtn.addEventListener('click', () => {
+                        if (!videoPlayer || !videoPlayer.src || videoDuration <= 0) return;
+                        videoPlayer.currentTime = Math.min(videoDuration, videoPlayer.currentTime + 0.033); // Approx 1 frame at 30fps
+                        updatePlaybackInfo();
+                        updateTimelinePlayhead();
+                    });
+                }
+                
+                // Toolbar play/pause button
+                const toolbarPlayBtn = document.querySelector('.toolbar-group button[title="Lejátszás/Szünet"]');
+                if (toolbarPlayBtn) {
+                    toolbarPlayBtn.addEventListener('click', togglePlayPause);
+                }
+                
+                // Toolbar navigation buttons
+                const toolbarStepBackBtn = document.querySelector('.toolbar-group button[title="Képkocka visszalépés"]');
+                if (toolbarStepBackBtn) {
+                    toolbarStepBackBtn.addEventListener('click', () => {
+                        if (!videoPlayer || !videoPlayer.src) return;
+                        videoPlayer.currentTime = Math.max(0, videoPlayer.currentTime - 0.033);
+                        updatePlaybackInfo();
+                        updateTimelinePlayhead();
+                    });
+                }
+                
+                const toolbarStepForwardBtn = document.querySelector('.toolbar-group button[title="Képkocka előrelépés"]');
+                if (toolbarStepForwardBtn) {
+                    toolbarStepForwardBtn.addEventListener('click', () => {
+                        if (!videoPlayer || !videoPlayer.src || videoDuration <= 0) return;
+                        videoPlayer.currentTime = Math.min(videoDuration, videoPlayer.currentTime + 0.033);
+                        updatePlaybackInfo();
+                        updateTimelinePlayhead();
+                    });
+                }
+                
+                const toolbarStopBtn = document.querySelector('.toolbar-group button[title="Leállítás"]');
+                if (toolbarStopBtn) {
+                    toolbarStopBtn.addEventListener('click', () => {
+                        if (!videoPlayer || !videoPlayer.src) return;
+                        videoPlayer.pause();
+                        videoPlayer.currentTime = 0;
+                        updatePlaybackInfo();
+                        updateTimelinePlayhead();
+                    });
+                }
+            }
+            
+            // Inicializáljuk a lejátszásvezérlőket
+            setupPlaybackControls();
+            
+            videoPlayer.addEventListener('timeupdate', () => {
+                currentTime = videoPlayer.currentTime;
+                updatePlaybackInfo();
+                updateTimelinePlayhead();
+            });
+            
+            videoPlayer.addEventListener('play', () => {
+                playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
+            });
+            
+            videoPlayer.addEventListener('pause', () => {
+                playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+            });
+            
+            // Trim controls setup
+            function setupTrimControls() {
+                // Panel gomb események
+                if (setStartBtn) {
+                    setStartBtn.addEventListener('click', () => {
+                        if (!videoPlayer || !videoPlayer.src) return;
+                        startTime = videoPlayer.currentTime;
+                        if (startTimeInput) startTimeInput.value = formatTime(startTime);
+                        updateVideoClip();
+                    });
+                }
+                
+                if (setEndBtn) {
+                    setEndBtn.addEventListener('click', () => {
+                        if (!videoPlayer || !videoPlayer.src) return;
+                        endTime = videoPlayer.currentTime;
+                        if (endTimeInput) endTimeInput.value = formatTime(endTime);
+                        updateVideoClip();
+                    });
+                }
+                
+                if (startTimeInput) {
+                    startTimeInput.addEventListener('change', () => {
+                        startTime = parseTime(startTimeInput.value);
+                        updateVideoClip();
+                    });
+                }
+                
+                if (endTimeInput) {
+                    endTimeInput.addEventListener('change', () => {
+                        endTime = parseTime(endTimeInput.value);
+                        updateVideoClip();
+                    });
+                }
+                
+                // Olló/vágás gombok is támogassák a vágást
+                const cutButton = document.querySelector('.toolbar-group button[title="Kivágás"]');
+                if (cutButton) {
+                    cutButton.addEventListener('click', () => {
+                        if (!videoPlayer || !videoPlayer.src) {
+                            alert("Kérjük, először töltsön fel egy videó fájlt!");
+                            return;
+                        }
+                        
+                        if (executeVideoBtn) {
+                            executeVideoBtn.click();
+                        }
+                    });
+                }
+                
+                // Timeline toolbar vágás gomb
+                const timelineCutButton = document.querySelector('.timeline-toolbar button[title="Kivágás"]');
+                if (timelineCutButton) {
+                    timelineCutButton.addEventListener('click', () => {
+                        if (!videoPlayer || !videoPlayer.src) {
+                            alert("Kérjük, először töltsön fel egy videó fájlt!");
+                            return;
+                        }
+                        
+                        if (executeVideoBtn) {
+                            executeVideoBtn.click();
+                        }
+                    });
+                }
+            }
+            
+            // Inicializáljuk a vágásvezérlőket
+            setupTrimControls();
+            
+            // Slider controls
+            const qualitySlider = document.getElementById('qualitySlider');
+            const qualityValue = document.getElementById('qualityValue');
+            if (qualitySlider && qualityValue) {
+                qualitySlider.addEventListener('input', () => {
+                    qualityValue.textContent = `${qualitySlider.value}%`;
+                });
+            }
+            
+            const fontSizeSlider = document.getElementById('subtitleFontSize');
+            const fontSizeValue = document.getElementById('subtitleFontSizeValue');
+            if (fontSizeSlider && fontSizeValue) {
+                fontSizeSlider.addEventListener('input', () => {
+                    fontSizeValue.textContent = `${fontSizeSlider.value}px`;
+                });
+            }
+            
+            // Timeline interaction
+            timelineRuler.addEventListener('click', (e) => {
+                const rect = timelineRuler.getBoundingClientRect();
+                const clickPosition = e.clientX - rect.left;
+                const timelineWidth = rect.width;
+                const clickedTime = (clickPosition / timelineWidth) * videoDuration;
+                
+                if (clickedTime >= 0 && clickedTime <= videoDuration) {
+                    videoPlayer.currentTime = clickedTime;
+                    updatePlaybackInfo();
+                    updateTimelinePlayhead();
+                }
+            });
+            
+            // Process video button (if not using the modular approach)
+            if (executeVideoBtn) {
+                executeVideoBtn.addEventListener('click', async () => {
+                    if (!currentVideoFile) {
+                        alert("Kérjük, először töltsön fel egy videó fájlt!");
+                        return;
+                    }
+                    
+                    // Show processing dialog
+                    processingDialog.style.display = 'flex';
+                    
+                    try {
+                        // Prepare form data for API call
+                        const formData = new FormData();
+                        formData.append("file", currentVideoFile);
+                        formData.append("start_time", startTimeInput.value);
+                        formData.append("end_time", endTimeInput.value);
+                        formData.append("output_format", outputFormat ? outputFormat.value : "mp4");
+                        formData.append("extract_audio", extractAudio && extractAudio.checked);
+                        formData.append("preserve_subtitles", preserveSubtitles && preserveSubtitles.checked);
+                        
+                        // Generate connection ID for WebSocket
+                        const connectionId = crypto.randomUUID();
+                        formData.append("connection_id", connectionId);
+                        
+                        // Initialize WebSocket for progress updates
+                        const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+                        const ws = new WebSocket(`${protocol}://${window.location.host}/ws/${connectionId}`);
+                        
+                        ws.onmessage = (event) => {
+                            const data = JSON.parse(event.data);
+                            progressBar.style.width = data.progress + "%";
+                            processingStatus.textContent = data.status;
+                        };
+                        
+                        // Send request to server
+                        const response = await fetch('/api/videocutter/trim', {
+                            method: "POST",
+                            body: formData
+                        });
+                        
+                        if (!response.ok) {
+                            throw new Error(await response.text());
+                        }
+                        
+                        // Process response
+                        const result = await response.json();
+                        progressBar.style.width = "100%";
+                        processingStatus.textContent = "Videó vágása befejezve!";
+                        
+                        // Hide processing dialog and show success dialog
+                        setTimeout(() => {
+                            processingDialog.style.display = 'none';
+                            successDialog.style.display = 'flex';
+                            timerIndicator.textContent = 'Feldolgozás kész';
+                        }, 1000);
+                        
+                        // Setup download button
+                        if (result.download_url) {
+                            downloadVideoBtn.onclick = () => window.open(result.download_url, '_blank');
+                        }
+                        
+                        if (ws) ws.close();
+                    } catch (error) {
+                        console.error("Error trimming video:", error);
+                        processingStatus.textContent = "Hiba: " + error.message;
+                        progressBar.classList.add("bg-red-500");
+                    }
+                });
+            }
+            
+            // Dialog controls
+            closeSuccessDialog.addEventListener('click', () => {
+                successDialog.style.display = 'none';
+            });
+            
+            continueEditingBtn.addEventListener('click', () => {
+                successDialog.style.display = 'none';
+            });
+            
+            // Call initializers from core.js if available
+            if (window.VideoEditorCore) {
+                console.log("Using VideoEditorCore module");
+                setTimeout(() => {
+                    if (window.VideoEditorCore.initializeUI) {
+                        window.VideoEditorCore.initializeUI();
+                    }
+                }, 500);
+            }
+            
+            downloadVideoBtn.addEventListener('click', () => {
+                // In a real implementation, this would download the processed video
+                successDialog.style.display = 'none';
+                alert('A videó letöltés elindult!');
+            });
+            
+            // Collapse/expand buttons
+            const collapseBtns = document.querySelectorAll('.collapse-btn');
+            collapseBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const panel = this.closest('.panel, .timeline');
+                    const contents = panel.querySelectorAll('.property-row, .thumbnail-grid, .filter-tabs, .video-preview, .controls, .timeline-content, .tabs, .timeline-toolbar, .property-table');
+                    
+                    if (this.textContent === '-') {
+                        contents.forEach(content => {
+                            if (content) content.style.display = 'none';
+                        });
+                        this.textContent = '+';
+                    } else {
+                        contents.forEach(content => {
+                            if (content) content.style.display = '';
+                        });
+                        this.textContent = '-';
+                    }
+                });
+            });
+            
+            // Tab switching
+            const tabs = document.querySelectorAll('.tab');
+            tabs.forEach(tab => {
+                tab.addEventListener('click', function() {
+                    const siblings = Array.from(this.parentElement.children);
+                    siblings.forEach(sib => sib.classList.remove('active'));
+                    this.classList.add('active');
+                });
+            });
+            
+            // Fájl műveletek  
+            document.querySelectorAll('.toolbar-group button').forEach(button => {
+                button.addEventListener('click', function() {
+                    // Az adott gomb ID vagy title alapján azonosítjuk a műveletet
+                    const action = this.getAttribute('id') || this.getAttribute('title');
+                    console.log("Button clicked:", action);
+                    
+                    if (this.id === 'importMediaBtn' || this.title === 'Médiafájl importálása') {
+                        if (videoFileInput) {
+                            videoFileInput.click();
+                        }
+                    }
+                    else if (this.id === 'exportVideoBtn' || this.title === 'Videó exportálása') {
+                        if (!currentVideoFile) {
+                            alert("Kérjük, először töltsön fel egy videó fájlt!");
+                            return;
+                        }
+                        
+                        if (executeVideoBtn) {
+                            executeVideoBtn.click();
+                        }
+                    }
+                });
+            });
+            
+            // Menubar clicks
+            document.querySelectorAll('.menu-item').forEach(item => {
+                item.addEventListener('click', function() {
+                    const text = this.textContent;
+                    console.log("Menu clicked:", text);
+                    
+                    if (text.includes('Fájl')) {
+                        if (videoFileInput) {
+                            videoFileInput.click();
+                        }
+                    }
+                });
+            });
+            
+            // Module tab switching
+            document.querySelectorAll('.module-tabs .tab-button').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    // Remove active class from all tabs
+                    document.querySelectorAll('.module-tabs .tab-button').forEach(t => t.classList.remove('active'));
+                    // Add active class to clicked tab
+                    this.classList.add('active');
+                    
+                    // Hide all module panels
+                    document.querySelectorAll('.module-panel').forEach(panel => panel.style.display = 'none');
+                    
+                    // Show the selected panel
+                    const panelId = this.getAttribute('data-tab') + '-panel';
+                    const panel = document.getElementById(panelId);
+                    if (panel) panel.style.display = 'block';
+                });
+            });
+            
+            // Zoom controls
+            const zoomInBtn = document.getElementById('zoomInBtn');
+            const zoomOutBtn = document.getElementById('zoomOutBtn');
+            let zoomLevel = 1;
+            
+            if (zoomInBtn) {
+                zoomInBtn.addEventListener('click', function() {
+                    zoomLevel = Math.min(5, zoomLevel + 0.5);
+                    updateTimelineZoom();
+                });
+            }
+            
+            if (zoomOutBtn) {
+                zoomOutBtn.addEventListener('click', function() {
+                    zoomLevel = Math.max(1, zoomLevel - 0.5);
+                    updateTimelineZoom();
+                });
+            }
+            
+            function updateTimelineZoom() {
+                const timelineContent = document.querySelector('.timeline-content');
+                if (!timelineContent) return;
+                
+                // Update width based on zoom level
+                const tracks = document.querySelectorAll('.track-content');
+                tracks.forEach(track => {
+                    track.style.width = (100 * zoomLevel) + '%';
+                });
+                
+                // Update ruler
+                createTimelineRuler();
+                
+                // Update clips position
+                if (videoDuration > 0) {
+                    updateVideoClip();
+                }
+            }
+            
+            // Helper functions
+            function togglePlayPause() {
+                if (videoPlayer.paused) {
+                    videoPlayer.play();
+                } else {
+                    videoPlayer.pause();
+                }
+            }
+            
+            function updatePlaybackInfo() {
+                if (!videoPlayer || !playbackInfo) return;
+                playbackInfo.textContent = `${formatTime(videoPlayer.currentTime || 0)} / ${formatTime(videoDuration || 0)}`;
+            }
+            
+            function updateTimelinePlayhead() {
+                if (!timelinePlayhead || !timelineRuler || !videoPlayer || videoDuration <= 0) return;
+                const position = (videoPlayer.currentTime / videoDuration) * timelineRuler.offsetWidth;
+                timelinePlayhead.style.left = `${position}px`;
+            }
+            
+            function formatTime(seconds) {
+                const hrs = Math.floor(seconds / 3600);
+                const mins = Math.floor((seconds % 3600) / 60);
+                const secs = Math.floor(seconds % 60);
+                
+                return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            }
+            
+            function parseTime(timeString) {
+                const [hrs, mins, secs] = timeString.split(':').map(Number);
+                return hrs * 3600 + mins * 60 + secs;
+            }
+            
+            function formatFileSize(bytes) {
+                if (bytes < 1024) return bytes + ' bytes';
+                else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+                else if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MB';
+                else return (bytes / 1073741824).toFixed(1) + ' GB';
+            }
+            
+            function createTimelineRuler() {
+                // Clear existing markers
+                timelineRuler.innerHTML = '';
+                
+                // Create time markers
+                const markers = Math.ceil(videoDuration / 5); // Every 5 seconds
+                
+                for (let i = 0; i <= markers; i++) {
+                    const marker = document.createElement('div');
+                    marker.textContent = formatTime(i * 5);
+                    timelineRuler.appendChild(marker);
+                }
+            }
+            
+            function createVideoClip() {
+                const videoTrack = document.getElementById('videoTrack');
+                videoTrack.innerHTML = '';
+                
+                const clip = document.createElement('div');
+                clip.className = 'timeline-clip clip-video';
+                clip.style.left = '0px';
+                clip.style.width = '100%';
+                
+                const clipContent = document.createElement('div');
+                clipContent.className = 'clip-content';
+                
+                const clipThumbnail = document.createElement('div');
+                clipThumbnail.className = 'clip-thumbnail';
+                
+                const clipLabel = document.createElement('div');
+                clipLabel.className = 'clip-label';
+                clipLabel.textContent = currentVideoFile.name;
+                
+                clipContent.appendChild(clipThumbnail);
+                clipContent.appendChild(clipLabel);
+                clip.appendChild(clipContent);
+                videoTrack.appendChild(clip);
+                
+                // Create audio track clip
+                const audioTrack = document.getElementById('audioTrack');
+                audioTrack.innerHTML = '';
+                
+                const audioClip = document.createElement('div');
+                audioClip.className = 'timeline-clip clip-audio';
+                audioClip.style.left = '0px';
+                audioClip.style.width = '100%';
+                
+                const audioClipContent = document.createElement('div');
+                audioClipContent.className = 'clip-content';
+                
+                const audioClipLabel = document.createElement('div');
+                audioClipLabel.className = 'clip-label';
+                audioClipLabel.textContent = 'Audio Track';
+                
+                audioClipContent.appendChild(audioClipLabel);
+                audioClip.appendChild(audioClipContent);
+                audioTrack.appendChild(audioClip);
+            }
+            
+            function updateVideoClip() {
+                // Update the video and audio clips based on trim times
+                if (videoDuration === 0) return;
+                
+                const videoTrack = document.getElementById('videoTrack');
+                const audioTrack = document.getElementById('audioTrack');
+                
+                const startPercent = (startTime / videoDuration) * 100;
+                const endPercent = (endTime / videoDuration) * 100;
+                const clipWidth = endPercent - startPercent;
+                
+                const videoClip = videoTrack.querySelector('.timeline-clip');
+                const audioClip = audioTrack.querySelector('.timeline-clip');
+                
+                if (videoClip) {
+                    videoClip.style.left = `${startPercent}%`;
+                    videoClip.style.width = `${clipWidth}%`;
+                }
+                
+                if (audioClip) {
+                    audioClip.style.left = `${startPercent}%`;
+                    audioClip.style.width = `${clipWidth}%`;
+                }
+            }
+            
+            // Initialize WebSocket for progress updates if needed
+            function initWebSocket(connectionId) {
+                const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+                const ws = new WebSocket(`${protocol}://${window.location.host}/ws/${connectionId}`);
+                
+                ws.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    if (progressBar) progressBar.style.width = data.progress + "%";
+                    if (processingStatus) processingStatus.textContent = data.status;
+                };
+                
+                ws.onerror = (error) => {
+                    console.error("WebSocket error:", error);
+                };
+                
+                return ws;
+            }
+            
+            // Make helper functions available to other modules
+            window.VideoEditorUtils = {
+                formatTime,
+                parseTime,
+                formatFileSize,
+                updateTimelinePlayhead,
+                updatePlaybackInfo,
+                initWebSocket
+            };
+        });
+    </script>
+    
+    <!-- Load additional modules -->
+    <script src="/static/js/videoeditor/modules/effects.js"></script>
+    <script src="/static/subtitles.js"></script>
+    
+    <!-- Initialize modules -->
+    <script>
+        // Global variable for subtitle file
+        let subtitleFile = null;
+        window.subtitleFile = null;
+        
+        // Function to handle subtitle file upload
+        function handleSubtitleFileUpload(file) {
+            const acceptedExtensions = ['.srt', '.vtt', '.ass', '.ssa'];
+            const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+            
+            if (!acceptedExtensions.includes(fileExtension)) {
+                alert("Nem támogatott felirat formátum. Támogatott formátumok: " + acceptedExtensions.join(', '));
+                return;
+            }
+            
+            // Store file
+            subtitleFile = file;
+            window.subtitleFile = file;
+            
+            // Show file info
+            const subtitleFileInfo = document.getElementById('subtitleFileInfo');
+            const subtitleFileName = document.getElementById('subtitleFileName');
+            
+            if (subtitleFileName) subtitleFileName.textContent = file.name;
+            if (subtitleFileInfo) subtitleFileInfo.classList.remove('hidden');
+            
+            console.log(`Subtitle file loaded: ${file.name}`);
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize Plyr for better video playback compatibility
+            const player = new Plyr('#videoPlayer', {
+                controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'settings', 'fullscreen'],
+                seekTime: 5,
+                keyboard: { focused: true, global: false },
+                tooltips: { controls: true, seek: true }
+            });
+            
+            window.plyrPlayer = player;
+            console.log("Plyr player initialized:", player);
+            
+            // Set up subtitle file input and drop zone
+            const subtitleDropZone = document.getElementById('subtitleDropZone');
+            const subtitleFileInput = document.getElementById('subtitleFileInput');
+            
+            if (subtitleDropZone && subtitleFileInput) {
+                // Click on drop zone to trigger file input
+                subtitleDropZone.addEventListener('click', () => {
+                    subtitleFileInput.click();
+                });
+                
+                // Handle drag and drop
+                subtitleDropZone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    subtitleDropZone.classList.add('dragover');
+                });
+                
+                subtitleDropZone.addEventListener('dragleave', () => {
+                    subtitleDropZone.classList.remove('dragover');
+                });
+                
+                subtitleDropZone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    subtitleDropZone.classList.remove('dragover');
+                    
+                    if (e.dataTransfer.files.length > 0) {
+                        handleSubtitleFileUpload(e.dataTransfer.files[0]);
+                    }
+                });
+                
+                // Handle file selection
+                subtitleFileInput.addEventListener('change', (e) => {
+                    if (e.target.files.length > 0) {
+                        handleSubtitleFileUpload(e.target.files[0]);
+                    }
+                });
+                
+                // Handle remove subtitle file button
+                const removeSubtitleFileBtn = document.getElementById('removeSubtitleFile');
+                if (removeSubtitleFileBtn) {
+                    removeSubtitleFileBtn.addEventListener('click', () => {
+                        subtitleFile = null;
+                        window.subtitleFile = null;
+                        
+                        const subtitleFileInfo = document.getElementById('subtitleFileInfo');
+                        if (subtitleFileInfo) subtitleFileInfo.classList.add('hidden');
+                    });
+                }
+            }
+            
+            // Set up subtitle font size slider
+            const subtitleFontSize = document.getElementById('subtitleFontSize');
+            const subtitleFontSizeValue = document.getElementById('subtitleFontSizeValue');
+            
+            if (subtitleFontSize && subtitleFontSizeValue) {
+                subtitleFontSize.addEventListener('input', () => {
+                    subtitleFontSizeValue.textContent = `${subtitleFontSize.value}px`;
+                });
+            }
+            
+            // Set up apply subtitle button
+            const applySubtitleBtn = document.getElementById('applySubtitleBtn');
+            if (applySubtitleBtn) {
+                applySubtitleBtn.addEventListener('click', () => {
+                    if (window.ProcessingModule && typeof window.ProcessingModule.applySubtitle === 'function') {
+                        window.ProcessingModule.applySubtitle();
+                    } else {
+                        alert("Felirat hozzáadás modul nem található!");
+                    }
+                });
+            }
+            
+            // Set up burn subtitle button
+            const burnSubtitleBtn = document.getElementById('burnSubtitleBtn');
+            if (burnSubtitleBtn) {
+                burnSubtitleBtn.addEventListener('click', () => {
+                    if (window.ProcessingModule && typeof window.ProcessingModule.burnSubtitle === 'function') {
+                        window.ProcessingModule.burnSubtitle();
+                    } else {
+                        alert("Felirat beégetés modul nem található!");
+                    }
+                });
+            }
+            
+            // We are now using Plyr instead of Video.js
+            /* 
+            // Initialize Video.js with enhanced options - DISABLED
+            const vjsPlayer = videojs('videoPlayer', {
+                controls: true,
+                autoplay: false,
+                preload: 'auto',
+                fluid: true,
+                playbackRates: [0.5, 1, 1.5, 2],
+                // Place html5 first to prioritize, then ogvjs as fallback
+                techOrder: ['html5', 'ogvjs'],
+                // Broader format support
+                sourceOrder: true, // Try sources in the order they're specified
+                html5: {
+                    nativeAudioTracks: false,
+                    nativeVideoTracks: false,
+                    nativeTextTracks: false,
+                    hls: { overrideNative: true }
+                },
+                ogvjs: {
+                    // OGV.js configuration for Ogg/Theora codec support
+                    base: 'https://cdn.jsdelivr.net/npm/ogv@1.8.5/dist/',
+                },
+                // Fix for some Safari issues
+                playsinline: true
+            });
+            */
+            
+            /* 
+            // Log player info and version - DISABLED because we're using Plyr now
+            console.log("Video.js version:", videojs.VERSION);
+            console.log("Supported tech:", videojs.getTech('Html5').isSupported());
+            
+            // Store player reference globally
+            window.vjsPlayer = player;
+            console.log("Video.js initialized:", player);
+            */
+            
+            // Initialize the Effects module if available
+            if (typeof window.EffectsModule !== 'undefined') {
+                window.EffectsModule.init();
+                console.log("Effects module initialized");
+            }
+            
+            // Add subtitle display to video player
+            const videoContainer = document.getElementById('videoContainer');
+            const subtitleDisplay = document.createElement('div');
+            subtitleDisplay.id = 'subtitleDisplay';
+            subtitleDisplay.style.position = 'absolute';
+            subtitleDisplay.style.bottom = '10%';
+            subtitleDisplay.style.left = '50%';
+            subtitleDisplay.style.transform = 'translateX(-50%)';
+            subtitleDisplay.style.backgroundColor = 'rgba(0,0,0,0.5)';
+            subtitleDisplay.style.color = 'white';
+            subtitleDisplay.style.padding = '5px 10px';
+            subtitleDisplay.style.borderRadius = '4px';
+            subtitleDisplay.style.fontSize = '18px';
+            subtitleDisplay.style.textAlign = 'center';
+            subtitleDisplay.style.maxWidth = '80%';
+            subtitleDisplay.style.zIndex = '100';
+            subtitleDisplay.style.display = 'none';
+            
+            if (videoContainer) {
+                videoContainer.appendChild(subtitleDisplay);
+            }
+            
+            // Expose video file getter for subtitle module
+            window.getVideoFile = function() {
+                return window.currentVideoFile;
+            };
+            
+            // Tab switching functionality
+            const tabButtons = document.querySelectorAll('.tab-button');
+            
+            tabButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    // Remove active class from all buttons
+                    tabButtons.forEach(btn => btn.classList.remove('active'));
+                    
+                    // Add active class to clicked button
+                    this.classList.add('active');
+                    
+                    // Hide all panels
+                    const panels = document.querySelectorAll('.module-panel');
+                    panels.forEach(panel => panel.style.display = 'none');
+                    
+                    // Show the corresponding panel
+                    const panelId = this.getAttribute('data-tab') + '-panel';
+                    const panel = document.getElementById(panelId);
+                    if (panel) {
+                        panel.style.display = 'block';
+                    }
+                });
+            });
+        });
+    </script>
+    
+    <!-- Beállítások panel -->
+    <div class="panel properties-panel module-panel" id="settings-panel" style="display: none; position: absolute; right: 10px; top: 50px; width: 300px; z-index: 1000;">
+        <div class="header">
+            <span><i class="fas fa-cog" style="margin-right: 5px;"></i>Beállítások</span>
+            <div class="header-controls">
+                <div id="closeSettingsBtn" style="cursor: pointer; width: 20px; height: 20px; display: flex; justify-content: center; align-items: center;"><i class="fas fa-times"></i></div>
+            </div>
+        </div>
+        <div class="panel-content">
+            <div class="property-row">
+                <div class="property-name">Téma</div>
+                <div class="property-value">
+                    <select id="themeSelector" style="width: 100%; background-color: var(--primary-light); border: 1px solid var(--border-color); color: var(--text-light); padding: 3px; border-radius: 3px;">
+                        <option value="dark">Sötét téma</option>
+                        <option value="light">Világos téma</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="property-row">
+                <div class="property-name">Nyelv</div>
+                <div class="property-value">
+                    <select id="languageSelector" style="width: 100%; background-color: var(--primary-light); border: 1px solid var(--border-color); color: var(--text-light); padding: 3px; border-radius: 3px;">
+                        <option value="hu">Magyar</option>
+                        <option value="en">Angol</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="property-row">
+                <div class="property-name">Automatikus mentés</div>
+                <div class="property-value">
+                    <div style="display: flex; align-items: center;">
+                        <input type="checkbox" id="autoSave" style="margin-right: 5px;" checked>
+                        <label for="autoSave">Engedélyezve</label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="property-row">
+                <div class="property-name">Mentés gyakorisága</div>
+                <div class="property-value">
+                    <select id="autoSaveInterval" style="width: 100%; background-color: var(--primary-light); border: 1px solid var(--border-color); color: var(--text-light); padding: 3px; border-radius: 3px;">
+                        <option value="1">1 perc</option>
+                        <option value="5" selected>5 perc</option>
+                        <option value="10">10 perc</option>
+                        <option value="15">15 perc</option>
+                    </select>
+                </div>
+            </div>
+            
+            <button style="width: 100%; margin-top: 15px; background-color: var(--secondary-color); color: var(--primary-dark); padding: 8px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                <i class="fas fa-save" style="margin-right: 5px;"></i> Beállítások Mentése
+            </button>
+        </div>
+    </div>
+    
+    <!-- Súgó panel -->
+    <div class="panel properties-panel" id="help-panel" style="display: none; position: absolute; right: 10px; top: 50px; width: 400px; z-index: 1000; max-height: 80vh; overflow-y: auto;">
+        <div class="header">
+            <span><i class="fas fa-question-circle" style="margin-right: 5px;"></i>Súgó</span>
+            <div class="header-controls">
+                <div id="closeHelpBtn" style="cursor: pointer; width: 20px; height: 20px; display: flex; justify-content: center; align-items: center;"><i class="fas fa-times"></i></div>
+            </div>
+        </div>
+        <div class="panel-content" style="padding: 15px;">
+            <h3 style="margin-top: 0; color: var(--secondary-color);">VideoMaster Használati Útmutató</h3>
+            
+            <h4 style="margin-top: 15px; color: var(--secondary-color);">Vágás</h4>
+            <ul style="padding-left: 20px; margin-top: 5px;">
+                <li>Töltsön fel egy videót a <strong>Húzd ide</strong> mezőbe kattintva vagy fájlt húzva.</li>
+                <li>A <strong>Vágás kezdete</strong> és <strong>Vágás vége</strong> mezőkkel beállíthatja a vágási pontokat.</li>
+                <li>A videó lejátszásakor a <strong>Kezdőpont beállítása</strong> és <strong>Végpont beállítása</strong> gombokkal is megjelölheti a vágás határait.</li>
+                <li>A video idővonalon a két <strong>csúszka</strong> húzásával vizuálisan is beállíthatja a vágási pontokat.</li>
+                <li>A <strong>Vágás Végrehajtása</strong> gombra kattintva elindíthatja a videó vágását.</li>
+            </ul>
+            
+            <h4 style="margin-top: 15px; color: var(--secondary-color);">Feliratok</h4>
+            <ul style="padding-left: 20px; margin-top: 5px;">
+                <li>A <strong>Felirat fájl feltöltése</strong> mezőben SRT vagy VTT formátumú feliratfájlt tölthet fel.</li>
+                <li>A <strong>Felirat Generálása</strong> gombbal automatikusan készíthet feliratot a videó hangsávjából.</li>
+                <li>A <strong>Felirat Beégetése</strong> funkcióval közvetlenül a videóba illesztheti a feliratokat.</li>
+                <li>A <strong>Feliratok Fordítása</strong> lehetőséggel más nyelvekre fordíthatja a meglévő feliratokat.</li>
+            </ul>
+            
+            <h4 style="margin-top: 15px; color: var(--secondary-color);">Effektek</h4>
+            <ul style="padding-left: 20px; margin-top: 5px;">
+                <li>Az <strong>Effekt típusa</strong> legördülő menüben különböző vizuális effekteket választhat.</li>
+                <li>A <strong>Forgatás</strong> opcióval elforgathatja a videót 90, 180 vagy 270 fokkal.</li>
+                <li>A <strong>Vízszintes tükrözés</strong> és <strong>Függőleges tükrözés</strong> lehetőségekkel átfordíthatja a képet.</li>
+                <li>Az <strong>Effektek Alkalmazása</strong> gombbal véglegesítheti a kiválasztott hatásokat.</li>
+            </ul>
+            
+            <h4 style="margin-top: 15px; color: var(--secondary-color);">Billentyűparancsok</h4>
+            <table style="width: 100%; border-collapse: collapse; margin-top: 5px;">
+                <tr>
+                    <td style="padding: 4px; border-bottom: 1px solid var(--border-color);"><strong>Szóköz</strong></td>
+                    <td style="padding: 4px; border-bottom: 1px solid var(--border-color);">Lejátszás / Szünet</td>
+                </tr>
+                <tr>
+                    <td style="padding: 4px; border-bottom: 1px solid var(--border-color);"><strong>I</strong></td>
+                    <td style="padding: 4px; border-bottom: 1px solid var(--border-color);">Kezdőpont beállítása</td>
+                </tr>
+                <tr>
+                    <td style="padding: 4px; border-bottom: 1px solid var(--border-color);"><strong>O</strong></td>
+                    <td style="padding: 4px; border-bottom: 1px solid var(--border-color);">Végpont beállítása</td>
+                </tr>
+                <tr>
+                    <td style="padding: 4px; border-bottom: 1px solid var(--border-color);"><strong>Balra nyíl</strong></td>
+                    <td style="padding: 4px; border-bottom: 1px solid var(--border-color);">Előző képkocka</td>
+                </tr>
+                <tr>
+                    <td style="padding: 4px; border-bottom: 1px solid var(--border-color);"><strong>Jobbra nyíl</strong></td>
+                    <td style="padding: 4px; border-bottom: 1px solid var(--border-color);">Következő képkocka</td>
+                </tr>
+                <tr>
+                    <td style="padding: 4px; border-bottom: 1px solid var(--border-color);"><strong>Ctrl+Z</strong></td>
+                    <td style="padding: 4px; border-bottom: 1px solid var(--border-color);">Visszavonás</td>
+                </tr>
+                <tr>
+                    <td style="padding: 4px; border-bottom: 1px solid var(--border-color);"><strong>Ctrl+S</strong></td>
+                    <td style="padding: 4px; border-bottom: 1px solid var(--border-color);">Mentés</td>
+                </tr>
+            </table>
+            
+            <h4 style="margin-top: 15px; color: var(--secondary-color);">Hibaelhárítás</h4>
+            <p style="margin-top: 5px;">Ha problémát tapasztal:</p>
+            <ul style="padding-left: 20px; margin-top: 5px;">
+                <li>Ellenőrizze, hogy a videó formátuma támogatott-e.</li>
+                <li>Újratöltés előtt mentse el a munkáját.</li>
+                <li>Ha a feldolgozás nem indul el, nyomja meg a <strong>Stop</strong> gombot, majd próbálja újra.</li>
+                <li>A vágás és effektek alkalmazása processzorigényes feladat, nagy fájloknál várjon türelemmel.</li>
+            </ul>
+            
+            <div style="margin-top: 20px; text-align: center; padding: 10px; border-top: 1px solid var(--border-color);">
+                <p style="margin: 5px 0;">MosaicMaster Video Editor v1.0</p>
+                <p style="margin: 5px 0; font-size: 12px;">© 2025 MosaicMaster Team</p>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Súgó panel megjelenítése és elrejtése
+            const helpButton = document.getElementById('helpMenuButton');
+            const helpPanel = document.getElementById('help-panel');
+            const closeHelpBtn = document.getElementById('closeHelpBtn');
+            
+            if (helpButton && helpPanel && closeHelpBtn) {
+                helpButton.addEventListener('click', function() {
+                    // Beállítások panel elrejtése ha nyitva van
+                    if (settingsPanel && settingsPanel.style.display === 'block') {
+                        settingsPanel.style.display = 'none';
+                    }
+                    helpPanel.style.display = helpPanel.style.display === 'none' ? 'block' : 'none';
+                });
+                
+                closeHelpBtn.addEventListener('click', function() {
+                    helpPanel.style.display = 'none';
+                });
+            }
+            
+            // Beállítások panel megjelenítése és elrejtése
+            const settingsButton = document.getElementById('settingsMenuButton');
+            const settingsPanel = document.getElementById('settings-panel');
+            const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+            
+            if (settingsButton && settingsPanel) {
+                settingsButton.addEventListener('click', function() {
+                    // Súgó panel elrejtése ha nyitva van
+                    if (helpPanel && helpPanel.style.display === 'block') {
+                        helpPanel.style.display = 'none';
+                    }
+                    settingsPanel.style.display = settingsPanel.style.display === 'none' ? 'block' : 'none';
+                });
+                
+                // Ha van bezáró gomb a beállítások panelen
+                if (closeSettingsBtn) {
+                    closeSettingsBtn.addEventListener('click', function() {
+                        settingsPanel.style.display = 'none';
+                    });
+                }
+            }
+        });
+    </script>
+</body>
+</html>
