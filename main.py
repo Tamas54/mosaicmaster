@@ -141,7 +141,8 @@ class VideoInfo(BaseModel):
     preview_hls_url: Optional[str] = None
     full_hls_url: Optional[str] = None
     stream_info: Optional[Dict[str, Any]] = None
-    download_url: Optional[str] = None  # Új: közvetlenül letölthető URL
+    source_url: Optional[str] = None  # Forrás URL letöltött videóknál
+    error_message: Optional[str] = None  # Hibaüzenet hiba esetén
 
 class VideoList(BaseModel):
     videos: List[VideoInfo]
@@ -150,6 +151,11 @@ class VideoList(BaseModel):
 class AddStreamRequest(BaseModel):
     url: str
     proxy_mode: bool = False
+    
+# Videó letöltés API model
+class VideoDownloadRequest(BaseModel):
+    url: str
+    platform: Optional[str] = "auto"  # auto, youtube, twitter, facebook, instagram, tiktok, videa, stb.
 
 class StreamResponse(BaseModel):
     id: str
@@ -1075,6 +1081,600 @@ async def remove_stream(stream_id: str):
         logger.error(f"Error removing stream {stream_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# Videó letöltő API végpontok
+@app.post("/api/download-video", response_model=VideoInfo)
+async def download_video(request: VideoDownloadRequest, background_tasks: BackgroundTasks):
+    """Videó letöltése URL-ről és hozzáadása a lejátszási könyvtárhoz, HLS feldolgozással"""
+    return await download_video_internal(request, background_tasks, process=True)
+
+@app.post("/api/download-video-only", response_model=VideoInfo)
+async def download_video_only(request: VideoDownloadRequest, background_tasks: BackgroundTasks):
+    """Videó letöltése URL-ről feldolgozás nélkül, csak közvetlen lejátszásra"""
+    return await download_video_internal(request, background_tasks, process=False)
+
+@app.post("/api/download-audio", response_model=VideoInfo)
+async def download_audio(request: VideoDownloadRequest, background_tasks: BackgroundTasks):
+    """Csak hang letöltése URL-ről és hozzáadása a lejátszási könyvtárhoz"""
+    return await download_audio_internal(request, background_tasks)
+
+@app.post("/api/download-system", response_model=VideoInfo)
+async def download_system(request: VideoDownloadRequest, background_tasks: BackgroundTasks):
+    """Videó letöltése URL-ről a rendszer Downloads mappájába"""
+    return await download_system_internal(request, background_tasks)
+
+@app.get("/api/download-status/{video_id}")
+async def get_download_status(video_id: str):
+    """Videó letöltési státusz ellenőrzése"""
+    if video_id not in videos_db:
+        raise HTTPException(status_code=404, detail="Video not found")
+    
+    video_info = videos_db[video_id]
+    status = video_info.get("status", "unknown")
+    
+    # Ha hibastátusz van, adjuk vissza a hibaüzenetet is
+    if status == "error" and "error_message" in video_info:
+        return {
+            "id": video_id,
+            "status": status,
+            "error_message": video_info["error_message"]
+        }
+    
+    # Különböző státuszok kezelése
+    if status in ["downloading", "processing"]:
+        return {
+            "id": video_id,
+            "status": status,
+            "message": "A videó feldolgozás alatt áll..."
+        }
+    elif status in ["ready", "preview_ready"]:
+        return {
+            "id": video_id,
+            "status": "ready",
+            "hls_url": video_info.get("hls_url"),
+            "preview_hls_url": video_info.get("preview_hls_url"),
+            "thumbnail": video_info.get("thumbnail")
+        }
+    
+    return {
+        "id": video_id,
+        "status": status
+    }
+
+async def download_video_internal(request: VideoDownloadRequest, background_tasks: BackgroundTasks, process: bool = True):
+    """Belső metódus a videó letöltéséhez"""
+    try:
+        logger.info(f"Video download request: {request.url}, platform: {request.platform}")
+        
+        # Egyedi azonosítók létrehozása
+        video_id = str(uuid.uuid4())
+        connection_id = str(uuid.uuid4())
+        
+        # Ideiglenes letöltési könyvtár
+        work_dir = temp_dir / connection_id
+        work_dir.mkdir(exist_ok=True, parents=True)
+        
+        # VideoDownloader példány inicializálása
+        downloader = VideoDownloader(connection_id, work_dir)
+        
+        # Kezdeti videó infó létrehozása
+        video_info = {
+            "id": video_id,
+            "filename": f"downloaded_video_{video_id}",
+            "original_format": "mp4",
+            "status": "downloading",
+            "source_url": request.url,
+            "web_compatible": False,
+            "thumbnail": None,
+            "duration": None,
+            "hls_url": None,
+            "preview_hls_url": None,
+            "full_hls_url": None,
+            "stream_info": None
+        }
+        
+        # Hozzáadás az adatbázishoz
+        videos_db[video_id] = video_info
+        
+        # Háttérfolyamat indítása a letöltéshez
+        background_tasks.add_task(
+            process_video_download, 
+            video_id, 
+            request.url, 
+            request.platform, 
+            downloader, 
+            connection_id,
+            process
+        )
+        
+        return video_info
+        
+    except Exception as e:
+        logger.error(f"Error starting video download: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+async def download_audio_internal(request: VideoDownloadRequest, background_tasks: BackgroundTasks):
+    """Belső metódus a hang letöltéséhez"""
+    try:
+        logger.info(f"Audio download request: {request.url}, platform: {request.platform}")
+        
+        # Egyedi azonosítók létrehozása
+        video_id = str(uuid.uuid4())
+        connection_id = str(uuid.uuid4())
+        
+        # Ideiglenes letöltési könyvtár
+        work_dir = temp_dir / connection_id
+        work_dir.mkdir(exist_ok=True, parents=True)
+        
+        # VideoDownloader példány inicializálása
+        downloader = VideoDownloader(connection_id, work_dir)
+        
+        # Kezdeti videó infó létrehozása
+        video_info = {
+            "id": video_id,
+            "filename": f"downloaded_audio_{video_id}",
+            "original_format": "mp3",
+            "status": "downloading",
+            "source_url": request.url,
+            "web_compatible": True,
+            "thumbnail": None,
+            "duration": None,
+            "hls_url": None,
+            "preview_hls_url": None,
+            "full_hls_url": None,
+            "stream_info": None
+        }
+        
+        # Hozzáadás az adatbázishoz
+        videos_db[video_id] = video_info
+        
+        # Háttérfolyamat indítása a letöltéshez
+        background_tasks.add_task(
+            process_audio_download, 
+            video_id, 
+            request.url, 
+            request.platform, 
+            downloader, 
+            connection_id
+        )
+        
+        return video_info
+        
+    except Exception as e:
+        logger.error(f"Error starting audio download: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+async def download_system_internal(request: VideoDownloadRequest, background_tasks: BackgroundTasks):
+    """Belső metódus a videó letöltéséhez a rendszer Downloads mappájába"""
+    try:
+        logger.info(f"System download request: {request.url}, platform: {request.platform}")
+        
+        # Egyedi azonosítók létrehozása
+        video_id = str(uuid.uuid4())
+        connection_id = str(uuid.uuid4())
+        
+        # Ideiglenes letöltési könyvtár
+        work_dir = temp_dir / connection_id
+        work_dir.mkdir(exist_ok=True, parents=True)
+        
+        # VideoDownloader példány inicializálása
+        downloader = VideoDownloader(connection_id, work_dir)
+        
+        # Kezdeti videó infó létrehozása
+        video_info = {
+            "id": video_id,
+            "filename": f"system_download_{video_id}",
+            "original_format": "mp4",
+            "status": "downloading",
+            "source_url": request.url,
+            "web_compatible": False,
+            "thumbnail": None,
+            "duration": None,
+            "hls_url": None,
+            "preview_hls_url": None,
+            "full_hls_url": None,
+            "stream_info": None
+        }
+        
+        # Hozzáadás az adatbázishoz
+        videos_db[video_id] = video_info
+        
+        # Háttérfolyamat indítása a letöltéshez
+        background_tasks.add_task(
+            process_system_download, 
+            video_id, 
+            request.url, 
+            request.platform, 
+            downloader, 
+            connection_id
+        )
+        
+        return video_info
+        
+    except Exception as e:
+        logger.error(f"Error starting system download: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+async def process_audio_download(video_id: str, url: str, platform: str, 
+                               downloader: VideoDownloader, connection_id: str):
+    """Hang letöltési folyamat"""
+    try:
+        logger.info(f"Starting audio download process for {url}")
+        
+        # Videó letöltése csak hanggal
+        video_path = await downloader.download_audio(url, platform)
+        
+        if not video_path or not video_path.exists():
+            logger.error(f"Audio download failed for {url}")
+            videos_db[video_id]["status"] = "error"
+            videos_db[video_id]["error_message"] = "Nem sikerült letölteni a hangot"
+            return
+        
+        # Sikeres letöltés, adatok frissítése
+        file_extension = video_path.suffix[1:]
+        filename = video_path.name
+        
+        # Áthelyezés a Downloads mappába
+        target_path = SYSTEM_DOWNLOADS / f"audio_{filename}"
+        shutil.copy(video_path, target_path)
+        
+        # Adatbázis frissítése
+        videos_db[video_id].update({
+            "filename": filename,
+            "original_format": file_extension,
+            "status": "ready",
+            "web_compatible": True
+        })
+        
+        # Sikeres feldolgozás, ideiglenes könyvtár törlése
+        await downloader.cleanup()
+        
+        logger.info(f"Audio download complete for {video_id}")
+        
+    except Exception as e:
+        logger.error(f"Error in audio download process: {e}")
+        videos_db[video_id]["status"] = "error"
+        videos_db[video_id]["error_message"] = str(e)
+        try:
+            await downloader.cleanup()
+        except:
+            pass
+
+async def process_system_download(video_id: str, url: str, platform: str, 
+                                downloader: VideoDownloader, connection_id: str):
+    """Rendszer mappába letöltési folyamat"""
+    try:
+        logger.info(f"Starting system download process for {url}")
+        
+        # Videó letöltése közvetlenül a rendszer Downloads mappájába
+        video_path = await downloader.download_to_system(url, platform)
+        
+        if not video_path or not video_path.exists():
+            logger.error(f"System download failed for {url}")
+            videos_db[video_id]["status"] = "error"
+            videos_db[video_id]["error_message"] = "Nem sikerült letölteni a videót a rendszer mappájába"
+            return
+        
+        # Sikeres letöltés, adatok frissítése
+        file_extension = video_path.suffix[1:]
+        filename = video_path.name
+        
+        # Adatbázis frissítése
+        videos_db[video_id].update({
+            "filename": filename,
+            "original_format": file_extension,
+            "status": "ready",
+            "web_compatible": file_extension.lower() in ['mp4', 'webm']
+        })
+        
+        # Thumbnail generálása
+        thumbnail_path = converted_dir / f"{video_id}_thumb.jpg"
+        video_player_service.generate_thumbnail(video_path, thumbnail_path)
+        
+        if os.path.exists(thumbnail_path):
+            videos_db[video_id]["thumbnail"] = f"/api/thumbnails/{video_id}"
+        
+        # Sikeres feldolgozás, ideiglenes könyvtár törlése
+        await downloader.cleanup()
+        
+        logger.info(f"System download complete for {video_id}")
+        
+    except Exception as e:
+        logger.error(f"Error in system download process: {e}")
+        videos_db[video_id]["status"] = "error"
+        videos_db[video_id]["error_message"] = str(e)
+        try:
+            await downloader.cleanup()
+        except:
+            pass
+
+async def process_video_download(video_id: str, url: str, platform: str, 
+                                 downloader: VideoDownloader, connection_id: str, process: bool = True):
+    """Videó letöltési és feldolgozási folyamat"""
+    try:
+        logger.info(f"Starting video download process for {url}")
+        
+        # Videó letöltése
+        video_path = await downloader.download_video(url, platform)
+        
+        if not video_path or not video_path.exists():
+            logger.error(f"Download failed for {url}")
+            videos_db[video_id]["status"] = "error"
+            videos_db[video_id]["error_message"] = "Nem sikerült letölteni a videót"
+            return
+        
+        # Sikeres letöltés, adatok frissítése
+        file_extension = video_path.suffix[1:]
+        filename = video_path.name
+        
+        # Áthelyezés a feltöltési könyvtárba
+        target_path = uploads_dir / f"{video_id}.{file_extension}"
+        shutil.copy(video_path, target_path)
+        
+        # Adatbázis frissítése
+        videos_db[video_id].update({
+            "filename": filename,
+            "original_format": file_extension,
+            "status": "processing",
+        })
+        
+        # Thumbnail generálása
+        thumbnail_path = converted_dir / f"{video_id}_thumb.jpg"
+        video_player_service.generate_thumbnail(target_path, thumbnail_path)
+        
+        if os.path.exists(thumbnail_path):
+            videos_db[video_id]["thumbnail"] = f"/api/thumbnails/{video_id}"
+        
+        # Ha kérte a feldolgozást, akkor indítjuk a konverziót
+        if process:
+            await video_player_service.convert_video(video_id, target_path, file_extension)
+            logger.info(f"Video processing complete for {video_id}")
+        else:
+            videos_db[video_id]["status"] = "ready"
+            videos_db[video_id]["web_compatible"] = file_extension.lower() in ['mp4', 'webm']
+            logger.info(f"Video download complete (no processing) for {video_id}")
+        
+        # Sikeres feldolgozás, ideiglenes könyvtár törlése
+        await downloader.cleanup()
+        
+        logger.info(f"Video download and processing complete for {video_id}")
+        
+    except Exception as e:
+        logger.error(f"Error in video download process: {e}")
+        videos_db[video_id]["status"] = "error"
+        videos_db[video_id]["error_message"] = str(e)
+        try:
+            await downloader.cleanup()
+        except:
+            pass
+
+# API végpontok az átiratoláshoz
+@app.post("/api/transcribe-url", response_model=dict)
+async def transcribe_from_url(request: dict, background_tasks: BackgroundTasks):
+    """URL-ből video átiratolása"""
+    try:
+        url = request.get("url")
+        platform = request.get("platform", "auto")
+        timecoded = request.get("timecoded", True)
+        identify_speakers = request.get("identify_speakers", False)
+        fast_mode = request.get("fast_mode", False)
+        
+        logger.info(f"Transcription request for URL {url} (fast_mode: {fast_mode})")
+        
+        # Egyedi azonosítók létrehozása
+        transcript_id = str(uuid.uuid4())
+        connection_id = str(uuid.uuid4())
+        
+        # Ideiglenes munkakönyvtár
+        work_dir = TEMP_DIR / connection_id
+        work_dir.mkdir(exist_ok=True, parents=True)
+        
+        # Háttérfolyamat indítása
+        background_tasks.add_task(
+            process_url_transcription,
+            transcript_id,
+            url,
+            platform,
+            timecoded,
+            identify_speakers,
+            fast_mode
+        )
+        
+        return {
+            "id": transcript_id,
+            "status": "processing",
+            "message": "Átiratolási folyamat elindítva"
+        }
+    except Exception as e:
+        logger.error(f"Error in transcription request: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/transcribe-video/{video_id}", response_model=dict)
+async def transcribe_video_url(video_id: str, request: dict, background_tasks: BackgroundTasks):
+    """Meglévő videó átiratolása URL alapon"""
+    try:
+        if video_id not in videos_db:
+            raise HTTPException(status_code=404, detail="Video not found")
+        
+        # Ellenőrizzük, hogy a videó elérhető-e
+        video_info = videos_db[video_id]
+        if video_info["status"] not in ["ready", "preview_ready"]:
+            raise HTTPException(status_code=400, detail="Video is not ready for transcription")
+        
+        # Paraméterek kiolvasása
+        timecoded = request.get("timecoded", True)
+        identify_speakers = request.get("identify_speakers", False)
+        fast_mode = request.get("fast_mode", False)
+        
+        logger.info(f"Video transcription request for {video_id} (fast_mode: {fast_mode})")
+        
+        # Forrás fájl elérési útja
+        file_extension = video_info["original_format"]
+        file_path = uploads_dir / f"{video_id}.{file_extension}"
+        
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail="Video file not found")
+        
+        # Egyedi azonosító a leirat számára
+        transcript_id = str(uuid.uuid4())
+        
+        # Háttérfolyamat indítása a leirat elkészítésére
+        background_tasks.add_task(
+            process_video_transcription,
+            transcript_id,
+            file_path,
+            video_info["filename"],
+            timecoded,
+            identify_speakers,
+            fast_mode
+        )
+        
+        return {
+            "id": transcript_id,
+            "status": "processing",
+            "message": "Leirat készítése folyamatban"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in video transcription: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+async def process_url_transcription(transcript_id: str, url: str, platform: str, 
+                               timecoded: bool = True, identify_speakers: bool = False, fast_mode: bool = False):
+    """URL-ből kinyert videó átiratolása háttérfolyamatban"""
+    try:
+        logger.info(f"Starting URL transcription process for {url} (fast_mode: {fast_mode})")
+        
+        # Ideiglenes munkakönyvtár
+        work_dir = TEMP_DIR / transcript_id
+        work_dir.mkdir(exist_ok=True, parents=True)
+        
+        # Videó letöltése az URL-ból
+        downloader = VideoDownloader(transcript_id, work_dir, manager)
+        video_path = await downloader.download_video(url, platform)
+        
+        if not video_path or not os.path.exists(video_path):
+            logger.error(f"Failed to download video from URL: {url}")
+            return
+        
+        # További feldolgozás az audio kinyerésével és átiratolással
+        await process_downloaded_media_transcription(transcript_id, video_path, os.path.basename(video_path), 
+                                                  timecoded, identify_speakers, fast_mode)
+        
+    except Exception as e:
+        logger.error(f"Error in URL transcription process: {e}")
+
+# Stream transcription endpoints
+@app.post("/api/streams/{stream_id}/transcribe")
+async def transcribe_stream_endpoint(stream_id: str, background_tasks: BackgroundTasks, data: dict):
+    """Stream leiratolás indítása"""
+    try:
+        # Ellenőrizzük, hogy a stream létezik-e
+        if stream_id not in live_stream_handler.active_streams:
+            logger.error(f"Cannot transcribe: Stream {stream_id} not found")
+            raise HTTPException(status_code=404, detail="Stream not found")
+        
+        # Ellenőrizzük, hogy van-e felvételi útvonal vagy megadták-e a request-ben
+        recording_path = data.get("recording_path")
+        stream_info = live_stream_handler.active_streams.get(stream_id)
+        
+        if not recording_path and (not stream_info or not stream_info.recording_path):
+            logger.error(f"Cannot transcribe: No recording path for stream {stream_id}")
+            raise HTTPException(status_code=400, detail="No recording path available")
+        
+        # Ha a stream info-ban van útvonal, azt használjuk
+        if not recording_path and stream_info and stream_info.recording_path:
+            recording_path = stream_info.recording_path
+        
+        # Ellenőrizzük, hogy létezik-e a fájl
+        if not os.path.exists(recording_path):
+            logger.error(f"Recording file not found: {recording_path}")
+            raise HTTPException(status_code=404, detail="Recording file not found")
+        
+        # Leiratolás indítása
+        logger.info(f"Starting transcription for stream {stream_id}, recording: {recording_path}")
+        result = await live_transcribe_stream(stream_id, recording_path, background_tasks)
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error starting transcription: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/streams/{stream_id}/transcribe/stop")
+async def stop_transcription(stream_id: str):
+    """Stream leiratolás leállítása"""
+    try:
+        # Ellenőrizzük, hogy a stream létezik-e
+        if stream_id not in live_stream_handler.active_streams:
+            logger.error(f"Cannot stop transcription: Stream {stream_id} not found")
+            raise HTTPException(status_code=404, detail="Stream not found")
+        
+        stream_info = live_stream_handler.active_streams.get(stream_id)
+        
+        if not stream_info:
+            logger.error(f"No stream info for stream {stream_id}")
+            raise HTTPException(status_code=404, detail="No stream info found")
+        
+        # Generáljunk eredményt
+        timestamp = int(time.time())
+        output_filename = f"partial_transcript_{stream_id}_{timestamp}.txt"
+        output_path = SYSTEM_DOWNLOADS / output_filename
+        
+        # Ellenőrizzük, hogy lehet-e leállítani meglévő feladatot
+        if stream_info.transcription_id and stream_info.transcription_id in live_stream_handler.transcription_tasks:
+            transcription_id = stream_info.transcription_id
+            logger.info(f"Found active transcription {transcription_id} for stream {stream_id}")
+            
+            # Feladat leállítása
+            task = live_stream_handler.transcription_tasks[transcription_id]
+            if task and not task.done():
+                logger.info(f"Cancelling transcription task {transcription_id} for stream {stream_id}")
+                task.cancel()
+                try:
+                    await asyncio.wait_for(task, timeout=2.0)
+                except asyncio.TimeoutError:
+                    logger.warning(f"Transcription task {transcription_id} did not stop within timeout")
+                except asyncio.CancelledError:
+                    logger.info(f"Transcription task {transcription_id} was cancelled successfully")
+                except Exception as e:
+                    logger.error(f"Error waiting for transcription task to cancel: {e}")
+            
+            # Töröljük a feladatot a nyilvántartásból
+            if transcription_id in live_stream_handler.transcription_tasks:
+                del live_stream_handler.transcription_tasks[transcription_id]
+            
+            # Töröljük a hivatkozást a stream információból
+            stream_info.transcription_id = None
+            
+            # Írjunk üzenetet a fájlba
+            with open(output_path, "w", encoding="utf-8") as f:
+                f.write("A leiratolás megszakítva. Részleges eredmény nem elérhető.")
+        else:
+            logger.warning(f"No active transcription task found for stream {stream_id}")
+            
+            # Írjunk üzenetet a fájlba
+            with open(output_path, "w", encoding="utf-8") as f:
+                f.write("Nem található aktív leiratolási feladat.")
+            
+            # Töröljük a hivatkozást a stream információból
+            if stream_info.transcription_id:
+                stream_info.transcription_id = None
+        
+        # Visszatérünk a letöltési URL-lel
+        return {
+            "status": "stopped",
+            "message": "Transcription stopped successfully",
+            "download_url": f"/download/{output_filename}"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error stopping transcription: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ====================== ROUTES FOR HTML PAGES ======================
 
@@ -1105,6 +1705,17 @@ async def get_live_streams():
     except Exception as e:
         logger.error(f"Error serving live streams page: {e}")
         return HTMLResponse(content="<h1>Error loading the live streams page</h1>")
+
+# Serve text reader page
+@app.get("/textreader.html", response_class=HTMLResponse)
+async def get_text_reader():
+    try:
+        with open("textreader.html", "r", encoding="utf-8") as f:
+            content = f.read()
+        return HTMLResponse(content=content)
+    except Exception as e:
+        logger.error(f"Error serving text reader page: {e}")
+        return HTMLResponse(content="<h1>Error loading the text reader page</h1>")
 
 
 # ====================== ROUTE MOUNTS ======================
