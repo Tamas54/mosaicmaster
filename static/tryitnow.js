@@ -1,14 +1,27 @@
-// Global fetch interceptor to ensure all API calls use relative URLs
+// FORCED CACHE BUST: Global fetch interceptor to ensure all API calls use relative URLs
 const originalFetch = window.fetch;
 window.fetch = function(url, options) {
+  console.log('TRYITNOW FETCH INTERCEPTOR: Original URL:', url);
+  
   // If URL contains the production domain, strip it to make it relative
   if (typeof url === 'string' && url.includes('mosaicmaster-production.up.railway.app')) {
     url = url.replace(/https?:\/\/mosaicmaster-production\.up\.railway\.app/g, '');
+    console.log('TRYITNOW FETCH INTERCEPTOR: Stripped production domain, new URL:', url);
   }
-  // Ensure API URLs are relative
+  
+  // Ensure API URLs are relative - MORE AGGRESSIVE PATTERN
   if (typeof url === 'string' && url.match(/^https?:\/\/.*\/api\//)) {
     url = url.replace(/^https?:\/\/[^\/]+/, '');
+    console.log('TRYITNOW FETCH INTERCEPTOR: Made API URL relative:', url);
   }
+  
+  // FORCE all API calls to be relative if they contain /api/
+  if (typeof url === 'string' && url.includes('/api/') && !url.startsWith('/')) {
+    url = '/' + url.replace(/^.*?\/api\//, 'api/');
+    console.log('TRYITNOW FETCH INTERCEPTOR: FORCED relative API URL:', url);
+  }
+  
+  console.log('TRYITNOW FETCH INTERCEPTOR: Final URL:', url);
   return originalFetch.call(this, url, options);
 };
 
