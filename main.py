@@ -43,6 +43,7 @@ from videoeditor import router as videoeditor_router
 from videocutter import router as videocutter_router
 from branding import router as branding_router
 from subtitle_module import router as subtitle_router
+from text_reader_service import router as text_reader_router, init_text_reader_service
 
 # Königstiger components
 from gpu_acceleration import GPUAccelerator
@@ -124,6 +125,9 @@ video_player_service = VideoPlayerService(
     logger=logger
 )
 
+# Initialize TextReaderService
+text_reader_service = init_text_reader_service(temp_dir, results_dir)
+
 # Model definitions for Königstiger
 class VideoInfo(BaseModel):
     id: str
@@ -173,6 +177,7 @@ app.include_router(videoeditor_router, prefix="/api/videoeditor", tags=["videoed
 app.include_router(videocutter_router, prefix="/api/videocutter", tags=["videocutter"])
 app.include_router(branding_router, prefix="/api/branding", tags=["branding"])
 app.include_router(subtitle_router, prefix="/api/subtitles", tags=["subtitles"])
+app.include_router(text_reader_router, tags=["text-reader"])
 
 # WebSocket endpoint for progress updates
 @app.websocket("/ws/{connection_id}")
