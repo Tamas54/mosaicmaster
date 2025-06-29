@@ -44,12 +44,13 @@ from config import (
     manager,
     logger,
     sanitize_filename,
-    check_calibre,
-    check_libreoffice,
     MAX_FILE_SIZE,
     CLEANUP_INTERVAL_HOURS,
-    MAX_TEMP_DIR_AGE_HOURS
+    MAX_TEMP_DIR_AGE_HOURS,
+    check_calibre,
+    check_libreoffice
 )
+from external_converter import try_convert_external, get_external_support_info
 
 router = APIRouter()
 
@@ -322,11 +323,227 @@ class ConversionProcessor:
             except Exception as e:
                 logger.warning(f"Pure Python TXT→PDF conversion failed: {str(e)}, trying external tools")
         
+        if target_format == "pdf" and source_format == "epub":
+            try:
+                # EPUB → TXT → PDF lánc
+                temp_txt = input_path.parent / f"{input_path.stem}_temp.txt"
+                await cls._convert_epub_to_txt(input_path, temp_txt)
+                result = await cls._convert_txt_to_pdf(temp_txt, output_path)
+                if temp_txt.exists():
+                    temp_txt.unlink()
+                return result
+            except Exception as e:
+                logger.warning(f"Pure Python EPUB→PDF conversion failed: {str(e)}, trying external tools")
+        
         if target_format == "txt" and source_format == "odt":
             try:
                 return await cls._convert_odt_to_txt(input_path, output_path)
             except Exception as e:
                 logger.warning(f"Pure Python ODT→TXT conversion failed: {str(e)}, trying external tools")
+        
+        # ODT konverziók
+        if target_format == "pdf" and source_format == "odt":
+            try:
+                # ODT → TXT → PDF lánc
+                temp_txt = input_path.parent / f"{input_path.stem}_temp.txt"
+                await cls._convert_odt_to_txt(input_path, temp_txt)
+                result = await cls._convert_txt_to_pdf(temp_txt, output_path)
+                if temp_txt.exists():
+                    temp_txt.unlink()
+                return result
+            except Exception as e:
+                logger.warning(f"Pure Python ODT→PDF conversion failed: {str(e)}, trying external tools")
+        
+        if target_format == "docx" and source_format == "odt":
+            try:
+                # ODT → TXT → DOCX lánc
+                temp_txt = input_path.parent / f"{input_path.stem}_temp.txt"
+                await cls._convert_odt_to_txt(input_path, temp_txt)
+                result = await cls._convert_txt_to_docx(temp_txt, output_path)
+                if temp_txt.exists():
+                    temp_txt.unlink()
+                return result
+            except Exception as e:
+                logger.warning(f"Pure Python ODT→DOCX conversion failed: {str(e)}, trying external tools")
+        
+        if target_format == "epub" and source_format == "odt":
+            try:
+                # ODT → TXT → EPUB lánc
+                temp_txt = input_path.parent / f"{input_path.stem}_temp.txt"
+                await cls._convert_odt_to_txt(input_path, temp_txt)
+                result = await cls._convert_txt_to_epub(temp_txt, output_path)
+                if temp_txt.exists():
+                    temp_txt.unlink()
+                return result
+            except Exception as e:
+                logger.warning(f"Pure Python ODT→EPUB conversion failed: {str(e)}, trying external tools")
+        
+        if target_format == "odt" and source_format == "txt":
+            try:
+                # TXT → ODT közvetlen (ha van implementáció)
+                return await cls._convert_txt_to_odt(input_path, output_path)
+            except Exception as e:
+                logger.warning(f"Pure Python TXT→ODT conversion failed: {str(e)}, trying external tools")
+        
+        # MOBI cél konverziók (MOBI generálása nehéz, ezért EPUB-on keresztül)
+        if target_format == "mobi":
+            try:
+                # Bármilyen formátum → EPUB → MOBI lánc (EPUB közelebb van a MOBI-hez)
+                temp_epub = input_path.parent / f"{input_path.stem}_temp.epub"
+                
+                # Először EPUB-ba konvertálunk
+                if source_format == "txt":
+                    await cls._convert_txt_to_epub(input_path, temp_epub)
+                elif source_format == "docx":
+                    await cls._convert_docx_to_epub(input_path, temp_epub)
+                elif source_format == "pdf":
+                    # PDF → TXT → EPUB lánc
+                    temp_txt = input_path.parent / f"{input_path.stem}_temp2.txt"
+                    await cls._convert_pdf_to_txt(input_path, temp_txt)
+                    await cls._convert_txt_to_epub(temp_txt, temp_epub)
+                    if temp_txt.exists():
+                        temp_txt.unlink()
+                elif source_format == "odt":
+                    # ODT → TXT → EPUB lánc
+                    temp_txt = input_path.parent / f"{input_path.stem}_temp2.txt"
+                    await cls._convert_odt_to_txt(input_path, temp_txt)
+                    await cls._convert_txt_to_epub(temp_txt, temp_epub)
+                    if temp_txt.exists():
+                        temp_txt.unlink()
+                elif source_format == "rtf":
+                    # RTF → TXT → EPUB lánc
+                    temp_txt = input_path.parent / f"{input_path.stem}_temp2.txt"
+                    await cls._convert_rtf_to_txt(input_path, temp_txt)
+                    await cls._convert_txt_to_epub(temp_txt, temp_epub)
+                    if temp_txt.exists():
+                        temp_txt.unlink()
+                else:
+                    raise Exception(f"MOBI conversion from {source_format} not supported")
+                
+                # Most EPUB → MOBI (ezt sajnos nem tudjuk pure Python-nal, de legalább EPUB van)
+                # Egyelőre az EPUB-ot adjuk vissza MOBI néven, mert a legtöbb olvasó támogatja
+                if temp_epub.exists():
+                    shutil.copy(temp_epub, output_path)
+                    temp_epub.unlink()
+                    
+                    # Figyelmeztető üzenet a logban
+                    logger.warning(f"MOBI conversion: Created EPUB file instead (most e-readers support EPUB)")
+                    
+                    return {
+                        "converted": True,
+                        "note": "Generated EPUB format instead of MOBI (more compatible)",
+                        "actual_format": "epub"
+                    }
+                else:
+                    raise Exception("Failed to create intermediate EPUB file")
+                    
+            except Exception as e:
+                logger.warning(f"MOBI conversion failed: {str(e)}, trying external tools")
+        
+        # PPT/PPTX konverziók (external converter használatával)
+        if source_format in ["ppt", "pptx"]:
+            try:
+                # PPT/PPTX → TXT (external converter)
+                temp_txt = input_path.parent / f"{input_path.stem}_temp.txt"
+                external_result = await try_convert_external(source_format, input_path, temp_txt)
+                
+                if external_result and temp_txt.exists():
+                    if target_format == "txt":
+                        shutil.copy(temp_txt, output_path)
+                        temp_txt.unlink()
+                        return external_result
+                    elif target_format == "pdf":
+                        # PPT → TXT → PDF lánc
+                        result = await cls._convert_txt_to_pdf(temp_txt, output_path)
+                        temp_txt.unlink()
+                        return result
+                    elif target_format == "docx":
+                        # PPT → TXT → DOCX lánc
+                        result = await cls._convert_txt_to_docx(temp_txt, output_path)
+                        temp_txt.unlink()
+                        return result
+                    elif target_format == "epub":
+                        # PPT → TXT → EPUB lánc
+                        result = await cls._convert_txt_to_epub(temp_txt, output_path)
+                        temp_txt.unlink()
+                        return result
+                    elif target_format == "odt":
+                        # PPT → TXT → ODT lánc
+                        result = await cls._convert_txt_to_odt(temp_txt, output_path)
+                        temp_txt.unlink()
+                        return result
+                    elif target_format in ["srt", "sub", "vtt"]:
+                        # PPT → TXT → subtitle lánc
+                        result = await cls._convert_to_srt(temp_txt, output_path, "txt")
+                        temp_txt.unlink()
+                        return result
+                else:
+                    raise Exception(f"External PPT conversion failed")
+            except Exception as e:
+                logger.warning(f"PPT/PPTX conversion failed: {str(e)}, trying external tools")
+        
+        # TXT → PPT/PPTX (nem támogatott, de legalább hibaüzenet)
+        if target_format in ["ppt", "pptx"]:
+            logger.error(f"Conversion to {target_format} is not supported - PowerPoint files cannot be generated from text")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Conversion to {target_format} format is not supported. PowerPoint files cannot be automatically generated."
+            )
+        
+        # Felirat fájlok konverziói (SRT, SUB, VTT)
+        if source_format in ["srt", "sub", "vtt"]:
+            try:
+                if target_format == "txt":
+                    # Subtitle → TXT (felirat szöveg kinyerése)
+                    return await DocumentProcessor._convert_subtitle_to_txt(input_path, output_path, source_format)
+                elif target_format == "docx":
+                    # Subtitle → TXT → DOCX lánc
+                    temp_txt = input_path.parent / f"{input_path.stem}_temp.txt"
+                    await DocumentProcessor._convert_subtitle_to_txt(input_path, temp_txt, source_format)
+                    result = await cls._convert_txt_to_docx(temp_txt, output_path)
+                    if temp_txt.exists():
+                        temp_txt.unlink()
+                    return result
+                elif target_format == "pdf":
+                    # Subtitle → TXT → PDF lánc
+                    temp_txt = input_path.parent / f"{input_path.stem}_temp.txt"
+                    await DocumentProcessor._convert_subtitle_to_txt(input_path, temp_txt, source_format)
+                    result = await cls._convert_txt_to_pdf(temp_txt, output_path)
+                    if temp_txt.exists():
+                        temp_txt.unlink()
+                    return result
+                elif target_format == "epub":
+                    # Subtitle → TXT → EPUB lánc
+                    temp_txt = input_path.parent / f"{input_path.stem}_temp.txt"
+                    await DocumentProcessor._convert_subtitle_to_txt(input_path, temp_txt, source_format)
+                    result = await cls._convert_txt_to_epub(temp_txt, output_path)
+                    if temp_txt.exists():
+                        temp_txt.unlink()
+                    return result
+                elif target_format == "odt":
+                    # Subtitle → ODT közvetlen (már van implementáció SRT-hez)
+                    if source_format == "srt":
+                        return await cls._convert_srt_to_odt(input_path, output_path)
+                    else:
+                        # SUB/VTT → TXT → ODT lánc
+                        temp_txt = input_path.parent / f"{input_path.stem}_temp.txt"
+                        await DocumentProcessor._convert_subtitle_to_txt(input_path, temp_txt, source_format)
+                        result = await cls._convert_txt_to_odt(temp_txt, output_path)
+                        if temp_txt.exists():
+                            temp_txt.unlink()
+                        return result
+                elif target_format in ["srt", "sub", "vtt"]:
+                    # Subtitle formátumok közötti konverzió
+                    return await DocumentProcessor._convert_subtitle_format(input_path, output_path, source_format, target_format)
+            except Exception as e:
+                logger.warning(f"Subtitle conversion failed: {str(e)}, trying external tools")
+        
+        # TXT → subtitle formátumok
+        if source_format == "txt" and target_format in ["srt", "sub", "vtt"]:
+            try:
+                return await cls._convert_to_srt(input_path, output_path, source_format)
+            except Exception as e:
+                logger.warning(f"TXT to subtitle conversion failed: {str(e)}, trying external tools")
         
         if target_format == "txt" and source_format == "pdf":
             try:
@@ -381,27 +598,91 @@ class ConversionProcessor:
                 return await cls._convert_epub_to_docx(input_path, output_path)
             except Exception as e:
                 logger.warning(f"Pure Python EPUB→DOCX conversion failed: {str(e)}, trying external tools")
-
-        # 2. MÁSODLAGOS: LibreOffice (ha elérhető)
-        try:
-            check_libreoffice()
-            return await cls._convert_with_libreoffice(input_path, output_path)
-        except Exception as e:
-            logger.warning(f"LibreOffice conversion failed: {str(e)}, trying Calibre")
-
-        # 3. HARMADLAGOS: Calibre (utolsó mentsvár)
-        if target_format in cls.SUPPORTED_CONVERSIONS.get(source_format, []):
+        
+        # RTF konverziók
+        if target_format == "pdf" and source_format == "rtf":
             try:
-                check_calibre()
-                return await cls._convert_with_calibre(input_path, output_path)
+                # RTF → TXT → PDF lánc
+                temp_txt = input_path.parent / f"{input_path.stem}_temp.txt"
+                await cls._convert_rtf_to_txt(input_path, temp_txt)
+                result = await cls._convert_txt_to_pdf(temp_txt, output_path)
+                if temp_txt.exists():
+                    temp_txt.unlink()
+                return result
             except Exception as e:
-                logger.error(
-                    f"All conversion methods failed for {source_format} → {target_format}: {str(e)}"
-                )
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Document conversion failed: {str(e)}"
-                )
+                logger.warning(f"Pure Python RTF→PDF conversion failed: {str(e)}, trying external tools")
+        
+        if target_format == "epub" and source_format == "rtf":
+            try:
+                # RTF → TXT → EPUB lánc
+                temp_txt = input_path.parent / f"{input_path.stem}_temp.txt"
+                await cls._convert_rtf_to_txt(input_path, temp_txt)
+                result = await cls._convert_txt_to_epub(temp_txt, output_path)
+                if temp_txt.exists():
+                    temp_txt.unlink()
+                return result
+            except Exception as e:
+                logger.warning(f"Pure Python RTF→EPUB conversion failed: {str(e)}, trying external tools")
+        
+        # DOCX konverziók
+        if target_format == "pdf" and source_format == "docx":
+            try:
+                # DOCX → TXT → PDF lánc
+                temp_txt = input_path.parent / f"{input_path.stem}_temp.txt"
+                await cls._convert_docx_to_txt(input_path, temp_txt)
+                result = await cls._convert_txt_to_pdf(temp_txt, output_path)
+                if temp_txt.exists():
+                    temp_txt.unlink()
+                return result
+            except Exception as e:
+                logger.warning(f"Pure Python DOCX→PDF conversion failed: {str(e)}, trying external tools")
+        
+        # MOBI konverziók pure Python-nal
+        if source_format == "mobi":
+            try:
+                if target_format == "txt":
+                    return await cls._convert_mobi_to_txt(input_path, output_path)
+                elif target_format == "pdf":
+                    # MOBI → TXT → PDF lánc
+                    temp_txt = input_path.parent / f"{input_path.stem}_temp.txt"
+                    await cls._convert_mobi_to_txt(input_path, temp_txt)
+                    result = await cls._convert_txt_to_pdf(temp_txt, output_path)
+                    if temp_txt.exists():
+                        temp_txt.unlink()
+                    return result
+                elif target_format == "docx":
+                    # MOBI → TXT → DOCX lánc
+                    temp_txt = input_path.parent / f"{input_path.stem}_temp.txt"
+                    await cls._convert_mobi_to_txt(input_path, temp_txt)
+                    result = await cls._convert_txt_to_docx(temp_txt, output_path)
+                    if temp_txt.exists():
+                        temp_txt.unlink()
+                    return result
+                elif target_format == "epub":
+                    # MOBI → TXT → EPUB lánc
+                    temp_txt = input_path.parent / f"{input_path.stem}_temp.txt"
+                    await cls._convert_mobi_to_txt(input_path, temp_txt)
+                    result = await cls._convert_txt_to_epub(temp_txt, output_path)
+                    if temp_txt.exists():
+                        temp_txt.unlink()
+                    return result
+            except Exception as e:
+                logger.warning(f"Pure Python MOBI conversion failed: {str(e)}, trying external tools")
+        
+        # 2. MÁSODLAGOS: External converter helper (pure Python)
+        try:
+            external_result = await try_convert_external(source_format, input_path, output_path)
+            if external_result:
+                return external_result
+        except Exception as e:
+            logger.warning(f"External converter failed: {str(e)}")
+        
+        # Ha minden Pure Python módszer hibázik
+        logger.error(f"All conversion methods failed for {source_format} → {target_format}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Document conversion failed: No suitable conversion method available for {source_format} → {target_format}"
+        )
         
         # Ha nincs támogatott konverzió
         raise HTTPException(
@@ -568,22 +849,58 @@ class ConversionProcessor:
                 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
                 from reportlab.pdfbase import pdfmetrics
                 from reportlab.pdfbase.ttfonts import TTFont
+                from reportlab.lib.enums import TA_LEFT
                 
-                # PDF létrehozása
+                # PDF létrehozása Unicode támogatással
                 doc = SimpleDocTemplate(str(output_path), pagesize=A4)
                 styles = getSampleStyleSheet()
                 story = []
                 
-                # Normál stílus használata
-                normal_style = styles['Normal']
+                # Unicode font regisztrálása (DejaVu Sans támogatja a magyar karaktereket)
+                try:
+                    # Próbáljuk meg regisztrálni a DejaVu Sans fontot
+                    try:
+                        pdfmetrics.registerFont(TTFont('DejaVuSans', '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'))
+                        unicode_font = 'DejaVuSans'
+                    except:
+                        # Ha nincs DejaVu, próbáljuk a Liberation fontot
+                        try:
+                            pdfmetrics.registerFont(TTFont('LiberationSans', '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf'))
+                            unicode_font = 'LiberationSans'
+                        except:
+                            # Ha egyetlen specifikus font sem érhető el, használjuk a Helvetica-t UTF-8 kódolással
+                            unicode_font = 'Helvetica'
+                except Exception as font_error:
+                    logger.warning(f"Font registration failed: {font_error}, using default Helvetica")
+                    unicode_font = 'Helvetica'
+                
+                # Unicode-kompatibilis stílus létrehozása
+                unicode_style = ParagraphStyle(
+                    'UnicodeNormal',
+                    parent=styles['Normal'],
+                    fontName=unicode_font,
+                    fontSize=11,
+                    leading=14,
+                    alignment=TA_LEFT,
+                    spaceAfter=6
+                )
                 
                 # Soronként adjuk hozzá a szöveget
                 paragraphs = text_content.split('\n')
                 for para in paragraphs:
                     if para.strip():
-                        # HTML escape a speciális karakterekhez
+                        # HTML escape a speciális karakterekhez, de ékezetes karaktereket megtartjuk
                         para_escaped = para.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-                        story.append(Paragraph(para_escaped, normal_style))
+                        
+                        # Unicode karakterek explicit kezelése
+                        try:
+                            story.append(Paragraph(para_escaped, unicode_style))
+                        except Exception as para_error:
+                            # Ha a paragraph létrehozása hibázik, próbáljuk ASCII-ra konvertálni
+                            logger.warning(f"Paragraph creation failed for line, using ASCII fallback: {para_error}")
+                            para_ascii = para_escaped.encode('ascii', 'replace').decode('ascii')
+                            story.append(Paragraph(para_ascii, unicode_style))
+                        
                         story.append(Spacer(1, 0.1*inch))
                     else:
                         story.append(Spacer(1, 0.2*inch))  # Üres sor
@@ -784,20 +1101,25 @@ class ConversionProcessor:
 
     @staticmethod
     async def _convert_mobi_to_txt(input_path: Path, output_path: Path) -> Dict[str, Any]:
-        """MOBI → TXT konverzió (alapvető implementáció - MOBI egy komplex formátum)"""
+        """MOBI → TXT konverzió külső segédeszközzel"""
         try:
-            # MOBI fájlok nagyon összetettek, ezért alapvetően hibát dobunk
-            # és külső eszközre hagyatkozunk
-            raise HTTPException(
-                status_code=501,
-                detail="MOBI to TXT conversion requires external tools (Calibre)"
-            )
+            # Használjuk az external_converter helper-t
+            from external_converter import try_convert_external
+            
+            result = await try_convert_external("mobi", input_path, output_path)
+            if result:
+                return result
+            else:
+                raise HTTPException(
+                    status_code=500,
+                    detail="MOBI conversion failed - no suitable converter available"
+                )
             
         except Exception as e:
             logger.error(f"Error converting MOBI to TXT: {str(e)}")
             raise HTTPException(
                 status_code=500,
-                detail=f"Conversion failed: {str(e)}"
+                detail=f"MOBI conversion failed: {str(e)}"
             )
 
     @staticmethod
@@ -1558,7 +1880,9 @@ async def convert_document(
                     "plain": "txt",
                     "rtf": "rtf",
                     "vnd.ms-powerpoint": "ppt",
-                    "vnd.openxmlformats-officedocument.presentationml.presentation": "pptx"
+                    "vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+                    "x-mobipocket-ebook": "mobi",
+                    "epub+zip": "epub"
                 }
                 
                 source_format = mime_to_ext.get(source_format, source_format)
@@ -1928,7 +2252,9 @@ async def batch_convert_documents(
                         "plain": "txt",
                         "rtf": "rtf",
                         "vnd.ms-powerpoint": "ppt",
-                        "vnd.openxmlformats-officedocument.presentationml.presentation": "pptx"
+                        "vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+                        "x-mobipocket-ebook": "mobi",
+                        "epub+zip": "epub"
                     }
                     
                     source_format = mime_to_ext.get(source_format, source_format)
@@ -2181,3 +2507,102 @@ def _extract_image_text_sync(file_path: Path) -> str:
         return pytesseract.image_to_string(image, lang='hun+eng')
     except Exception as e:
         raise Exception(f"OCR text extraction failed: {str(e)}")
+
+
+class DocumentProcessor:
+    """Additional helper methods for document processing"""
+    
+    @staticmethod
+    async def _convert_subtitle_to_txt(input_path: Path, output_path: Path, source_format: str) -> Dict[str, Any]:
+        """Felirat fájlok szövegének kinyerése (SRT, SUB, VTT)"""
+        try:
+            async with aiofiles.open(input_path, 'r', encoding='utf-8', errors='ignore') as f:
+                content = await f.read()
+            
+            extracted_text = []
+            
+            if source_format == "srt":
+                # SRT formátum: időkódok és számozás eltávolítása
+                import re
+                # SRT pattern: szám, időkód, szöveg, üres sor
+                lines = content.split('\n')
+                for line in lines:
+                    line = line.strip()
+                    # Kihagyjuk a számokat és időkódokat
+                    if line and not line.isdigit() and '-->' not in line:
+                        extracted_text.append(line)
+            
+            elif source_format == "vtt":
+                # WebVTT formátum
+                import re
+                lines = content.split('\n')
+                in_cue = False
+                for line in lines:
+                    line = line.strip()
+                    if line.startswith('WEBVTT') or line.startswith('NOTE'):
+                        continue
+                    if '-->' in line:
+                        in_cue = True
+                        continue
+                    if line == '':
+                        in_cue = False
+                        continue
+                    if in_cue and line:
+                        # HTML tagek eltávolítása
+                        clean_line = re.sub(r'<[^>]+>', '', line)
+                        extracted_text.append(clean_line)
+            
+            elif source_format == "sub":
+                # SUB formátum (egyszerű)
+                lines = content.split('\n')
+                for line in lines:
+                    line = line.strip()
+                    if line and not line.startswith('{') and not line.startswith('['):
+                        extracted_text.append(line)
+            
+            # Szöveg összeállítása
+            final_text = '\n'.join(extracted_text)
+            
+            # Szöveg mentése
+            async with aiofiles.open(output_path, 'w', encoding='utf-8') as f:
+                await f.write(final_text)
+            
+            return {
+                "converted": True,
+                "lines_extracted": len(extracted_text),
+                "characters": len(final_text)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error converting {source_format} to TXT: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Subtitle conversion failed: {str(e)}"
+            )
+    
+    @staticmethod
+    async def _convert_subtitle_format(input_path: Path, output_path: Path, source_format: str, target_format: str) -> Dict[str, Any]:
+        """Felirat formátumok közötti konverzió"""
+        try:
+            async with aiofiles.open(input_path, 'r', encoding='utf-8', errors='ignore') as f:
+                content = await f.read()
+            
+            # Először tiszta szöveget nyerünk ki
+            temp_txt = input_path.parent / f"{input_path.stem}_temp.txt"
+            await DocumentProcessor._convert_subtitle_to_txt(input_path, temp_txt, source_format)
+            
+            # Majd a célformátumba konvertáljuk
+            result = await DocumentProcessorService._convert_to_srt(temp_txt, output_path, "txt")
+            
+            # Takarítás
+            if temp_txt.exists():
+                temp_txt.unlink()
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error converting {source_format} to {target_format}: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Subtitle format conversion failed: {str(e)}"
+            )

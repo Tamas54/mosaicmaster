@@ -25,6 +25,7 @@ from config import (
     manager,
     logger,
     check_calibre,
+    check_libreoffice,
     API_KEYS,
     UPLOAD_LIMIT_MB,
     client

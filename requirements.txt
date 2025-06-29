@@ -85,4 +85,6 @@ wrapt==1.17.2
 XlsxWriter==3.2.0
 yarl==1.18.3
 yt-dlp==2025.1.26
-calibre
+docx2txt==0.8
+mobi==0.3.3
+olefile==0.47
