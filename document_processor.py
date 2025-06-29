@@ -287,38 +287,60 @@ class ConversionProcessor:
             return await cls._convert_to_srt(input_path, output_path, source_format)
 
         # Egyedi kezelés DOCX generálása esetén
+        # 1. ELSŐDLEGES: Pure Python konverziók
         if target_format == "docx" and source_format != "docx":
-            # Ha nem docx → docx konverzió, használjunk közvetlen megoldást
             try:
                 if source_format == "txt":
                     return await cls._convert_txt_to_docx(input_path, output_path)
                 elif source_format == "pdf":
                     return await cls._convert_pdf_to_docx(input_path, output_path)
             except Exception as e:
-                logger.warning(f"Direct conversion failed: {str(e)}, trying alternative methods")
+                logger.warning(f"Pure Python conversion failed: {str(e)}, trying external tools")
+        
+        if target_format == "epub" and source_format == "pdf":
+            try:
+                return await cls._convert_pdf_to_epub_chunked(input_path, output_path)
+            except Exception as e:
+                logger.warning(f"Pure Python PDF→EPUB conversion failed: {str(e)}, trying external tools")
+        
+        if target_format == "docx" and source_format == "srt":
+            try:
+                return await cls._convert_srt_to_docx(input_path, output_path)
+            except Exception as e:
+                logger.warning(f"Pure Python SRT→DOCX conversion failed: {str(e)}, trying external tools")
+        
+        if target_format == "odt" and source_format == "srt":
+            try:
+                return await cls._convert_srt_to_odt(input_path, output_path)
+            except Exception as e:
+                logger.warning(f"Pure Python SRT→ODT conversion failed: {str(e)}, trying external tools")
 
-        # Calibre használata előtt ellenőrzés
+        # 2. MÁSODLAGOS: LibreOffice (ha elérhető)
         try:
-            check_calibre()
+            check_libreoffice()
+            return await cls._convert_with_libreoffice(input_path, output_path)
         except Exception as e:
-            logger.warning(f"Calibre check failed: {str(e)}")
-            # Folytatjuk LibreOffice-szal
+            logger.warning(f"LibreOffice conversion failed: {str(e)}, trying Calibre")
 
-        # Általános konverziók
+        # 3. HARMADLAGOS: Calibre (utolsó mentsvár)
         if target_format in cls.SUPPORTED_CONVERSIONS.get(source_format, []):
             try:
-                result = await cls._convert_with_calibre(input_path, output_path)
-                return result
-            except HTTPException as e:
-                if "Calibre conversion failed" in str(e.detail):
-                    logger.warning(
-                        f"Calibre conversion failed, falling back to LibreOffice for "
-                        f"{source_format} → {target_format}"
-                    )
-                else:
-                    raise
-
-        return await cls._convert_with_libreoffice(input_path, output_path)
+                check_calibre()
+                return await cls._convert_with_calibre(input_path, output_path)
+            except Exception as e:
+                logger.error(
+                    f"All conversion methods failed for {source_format} → {target_format}: {str(e)}"
+                )
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Document conversion failed: {str(e)}"
+                )
+        
+        # Ha nincs támogatott konverzió
+        raise HTTPException(
+            status_code=400,
+            detail=f"Conversion from {source_format} to {target_format} is not supported"
+        )
 
     @staticmethod
     async def process_txt(file_path: Path, preserve_format: bool = False) -> Tuple[str, Dict[str, Any]]:
