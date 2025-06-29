@@ -315,6 +315,12 @@ class ConversionProcessor:
                 return await cls._convert_srt_to_odt(input_path, output_path)
             except Exception as e:
                 logger.warning(f"Pure Python SRT→ODT conversion failed: {str(e)}, trying external tools")
+        
+        if target_format == "pdf" and source_format == "txt":
+            try:
+                return await cls._convert_txt_to_pdf(input_path, output_path)
+            except Exception as e:
+                logger.warning(f"Pure Python TXT→PDF conversion failed: {str(e)}, trying external tools")
 
         # 2. MÁSODLAGOS: LibreOffice (ha elérhető)
         try:
@@ -481,6 +487,59 @@ class ConversionProcessor:
             
         except Exception as e:
             logger.error(f"Error converting TXT to DOCX: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Conversion failed: {str(e)}"
+            )
+
+    @staticmethod
+    async def _convert_txt_to_pdf(input_path: Path, output_path: Path) -> Dict[str, Any]:
+        """TXT → PDF közvetlen konverzió a ReportLab csomaggal"""
+        try:
+            async with aiofiles.open(input_path, 'r', encoding='utf-8', errors='ignore') as f:
+                text = await f.read()
+            
+            loop = asyncio.get_event_loop()
+            
+            def create_pdf(text_content):
+                from reportlab.lib.pagesizes import letter, A4
+                from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+                from reportlab.lib.units import inch
+                from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+                from reportlab.pdfbase import pdfmetrics
+                from reportlab.pdfbase.ttfonts import TTFont
+                
+                # PDF létrehozása
+                doc = SimpleDocTemplate(str(output_path), pagesize=A4)
+                styles = getSampleStyleSheet()
+                story = []
+                
+                # Normál stílus használata
+                normal_style = styles['Normal']
+                
+                # Soronként adjuk hozzá a szöveget
+                paragraphs = text_content.split('\n')
+                for para in paragraphs:
+                    if para.strip():
+                        # HTML escape a speciális karakterekhez
+                        para_escaped = para.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                        story.append(Paragraph(para_escaped, normal_style))
+                        story.append(Spacer(1, 0.1*inch))
+                    else:
+                        story.append(Spacer(1, 0.2*inch))  # Üres sor
+                        
+                doc.build(story)
+                return True
+                
+            success = await loop.run_in_executor(None, create_pdf, text)
+            
+            if not success:
+                raise ConversionError("Failed to create PDF")
+                
+            return {"converted": True}
+            
+        except Exception as e:
+            logger.error(f"Error converting TXT to PDF: {str(e)}")
             raise HTTPException(
                 status_code=500,
                 detail=f"Conversion failed: {str(e)}"
