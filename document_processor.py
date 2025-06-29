@@ -369,6 +369,18 @@ class ConversionProcessor:
                 return await cls._convert_rtf_to_docx(input_path, output_path)
             except Exception as e:
                 logger.warning(f"Pure Python RTF→DOCX conversion failed: {str(e)}, trying external tools")
+        
+        if target_format == "epub" and source_format == "docx":
+            try:
+                return await cls._convert_docx_to_epub(input_path, output_path)
+            except Exception as e:
+                logger.warning(f"Pure Python DOCX→EPUB conversion failed: {str(e)}, trying external tools")
+        
+        if target_format == "docx" and source_format == "epub":
+            try:
+                return await cls._convert_epub_to_docx(input_path, output_path)
+            except Exception as e:
+                logger.warning(f"Pure Python EPUB→DOCX conversion failed: {str(e)}, trying external tools")
 
         # 2. MÁSODLAGOS: LibreOffice (ha elérhető)
         try:
@@ -867,6 +879,58 @@ class ConversionProcessor:
             
         except Exception as e:
             logger.error(f"Error converting RTF to DOCX: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Conversion failed: {str(e)}"
+            )
+
+    @staticmethod
+    async def _convert_docx_to_epub(input_path: Path, output_path: Path) -> Dict[str, Any]:
+        """DOCX → EPUB közvetlen konverzió"""
+        try:
+            # Először DOCX → TXT
+            temp_txt = input_path.parent / f"temp_{input_path.stem}.txt"
+            await ConversionProcessor._convert_docx_to_txt(input_path, temp_txt)
+            
+            # Aztán TXT → EPUB
+            result = await ConversionProcessor._convert_txt_to_epub(temp_txt, output_path)
+            
+            # Temp fájl törlése
+            try:
+                temp_txt.unlink()
+            except:
+                pass
+                
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error converting DOCX to EPUB: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Conversion failed: {str(e)}"
+            )
+
+    @staticmethod
+    async def _convert_epub_to_docx(input_path: Path, output_path: Path) -> Dict[str, Any]:
+        """EPUB → DOCX közvetlen konverzió"""
+        try:
+            # Először EPUB → TXT
+            temp_txt = input_path.parent / f"temp_{input_path.stem}.txt"
+            await ConversionProcessor._convert_epub_to_txt(input_path, temp_txt)
+            
+            # Aztán TXT → DOCX
+            result = await ConversionProcessor._convert_txt_to_docx(temp_txt, output_path)
+            
+            # Temp fájl törlése
+            try:
+                temp_txt.unlink()
+            except:
+                pass
+                
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error converting EPUB to DOCX: {str(e)}")
             raise HTTPException(
                 status_code=500,
                 detail=f"Conversion failed: {str(e)}"
