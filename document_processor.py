@@ -321,6 +321,12 @@ class ConversionProcessor:
                 return await cls._convert_txt_to_pdf(input_path, output_path)
             except Exception as e:
                 logger.warning(f"Pure Python TXT→PDF conversion failed: {str(e)}, trying external tools")
+        
+        if target_format == "txt" and source_format == "odt":
+            try:
+                return await cls._convert_odt_to_txt(input_path, output_path)
+            except Exception as e:
+                logger.warning(f"Pure Python ODT→TXT conversion failed: {str(e)}, trying external tools")
 
         # 2. MÁSODLAGOS: LibreOffice (ha elérhető)
         try:
@@ -540,6 +546,44 @@ class ConversionProcessor:
             
         except Exception as e:
             logger.error(f"Error converting TXT to PDF: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Conversion failed: {str(e)}"
+            )
+
+    @staticmethod
+    async def _convert_odt_to_txt(input_path: Path, output_path: Path) -> Dict[str, Any]:
+        """ODT → TXT közvetlen konverzió a zipfile és BeautifulSoup csomagokkal"""
+        try:
+            import zipfile
+            from bs4 import BeautifulSoup
+            
+            loop = asyncio.get_event_loop()
+            
+            def extract_odt_text():
+                try:
+                    with zipfile.ZipFile(input_path, 'r') as odt_zip:
+                        with odt_zip.open('content.xml') as content_file:
+                            content = content_file.read().decode('utf-8', errors="ignore")
+                            soup = BeautifulSoup(content, "xml")
+                            paragraphs = soup.find_all("text:p")
+                            text = "\n".join(p.get_text() for p in paragraphs)
+                            return text
+                except zipfile.BadZipFile:
+                    raise Exception("Invalid ODT file (bad zip structure)")
+                except Exception as e:
+                    raise Exception(f"ODT text extraction error: {str(e)}")
+                    
+            text = await loop.run_in_executor(None, extract_odt_text)
+            
+            # TXT fájl mentése
+            async with aiofiles.open(output_path, 'w', encoding='utf-8') as f:
+                await f.write(text)
+                
+            return {"converted": True}
+            
+        except Exception as e:
+            logger.error(f"Error converting ODT to TXT: {str(e)}")
             raise HTTPException(
                 status_code=500,
                 detail=f"Conversion failed: {str(e)}"
