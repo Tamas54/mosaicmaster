@@ -345,6 +345,30 @@ class ConversionProcessor:
                 return await cls._convert_rtf_to_txt(input_path, output_path)
             except Exception as e:
                 logger.warning(f"Pure Python RTF→TXT conversion failed: {str(e)}, trying external tools")
+        
+        if target_format == "txt" and source_format == "epub":
+            try:
+                return await cls._convert_epub_to_txt(input_path, output_path)
+            except Exception as e:
+                logger.warning(f"Pure Python EPUB→TXT conversion failed: {str(e)}, trying external tools")
+        
+        if target_format == "txt" and source_format == "mobi":
+            try:
+                return await cls._convert_mobi_to_txt(input_path, output_path)
+            except Exception as e:
+                logger.warning(f"Pure Python MOBI→TXT conversion failed: {str(e)}, trying external tools")
+        
+        if target_format == "epub" and source_format == "txt":
+            try:
+                return await cls._convert_txt_to_epub(input_path, output_path)
+            except Exception as e:
+                logger.warning(f"Pure Python TXT→EPUB conversion failed: {str(e)}, trying external tools")
+        
+        if target_format == "docx" and source_format == "rtf":
+            try:
+                return await cls._convert_rtf_to_docx(input_path, output_path)
+            except Exception as e:
+                logger.warning(f"Pure Python RTF→DOCX conversion failed: {str(e)}, trying external tools")
 
         # 2. MÁSODLAGOS: LibreOffice (ha elérhető)
         try:
@@ -702,6 +726,147 @@ class ConversionProcessor:
             
         except Exception as e:
             logger.error(f"Error converting RTF to TXT: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Conversion failed: {str(e)}"
+            )
+
+    @staticmethod
+    async def _convert_epub_to_txt(input_path: Path, output_path: Path) -> Dict[str, Any]:
+        """EPUB → TXT közvetlen konverzió a ebooklib csomaggal"""
+        try:
+            import ebooklib
+            from ebooklib import epub
+            from bs4 import BeautifulSoup
+            
+            loop = asyncio.get_event_loop()
+            
+            def extract_epub_text():
+                try:
+                    book = epub.read_epub(str(input_path))
+                    text_content = []
+                    
+                    for item in book.get_items():
+                        if item.get_type() == ebooklib.ITEM_DOCUMENT:
+                            soup = BeautifulSoup(item.get_content(), 'html.parser')
+                            text_content.append(soup.get_text())
+                    
+                    return "\n\n".join(text_content)
+                except Exception as e:
+                    raise Exception(f"EPUB text extraction error: {str(e)}")
+                    
+            text = await loop.run_in_executor(None, extract_epub_text)
+            
+            # TXT fájl mentése
+            async with aiofiles.open(output_path, 'w', encoding='utf-8') as f:
+                await f.write(text)
+                
+            return {"converted": True}
+            
+        except Exception as e:
+            logger.error(f"Error converting EPUB to TXT: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Conversion failed: {str(e)}"
+            )
+
+    @staticmethod
+    async def _convert_mobi_to_txt(input_path: Path, output_path: Path) -> Dict[str, Any]:
+        """MOBI → TXT konverzió (alapvető implementáció - MOBI egy komplex formátum)"""
+        try:
+            # MOBI fájlok nagyon összetettek, ezért alapvetően hibát dobunk
+            # és külső eszközre hagyatkozunk
+            raise HTTPException(
+                status_code=501,
+                detail="MOBI to TXT conversion requires external tools (Calibre)"
+            )
+            
+        except Exception as e:
+            logger.error(f"Error converting MOBI to TXT: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Conversion failed: {str(e)}"
+            )
+
+    @staticmethod
+    async def _convert_txt_to_epub(input_path: Path, output_path: Path) -> Dict[str, Any]:
+        """TXT → EPUB közvetlen konverzió a ebooklib csomaggal"""
+        try:
+            import ebooklib
+            from ebooklib import epub
+            
+            async with aiofiles.open(input_path, 'r', encoding='utf-8', errors='ignore') as f:
+                text = await f.read()
+            
+            loop = asyncio.get_event_loop()
+            
+            def create_epub(text_content):
+                try:
+                    book = epub.EpubBook()
+                    book.set_identifier('txt_conversion')
+                    book.set_title('Converted from TXT')
+                    book.set_language('en')
+                    book.add_author('MosaicMaster Converter')
+                    
+                    # Szöveg felosztása fejezetekre (üres sorok alapján)
+                    chapters = text_content.split('\n\n')
+                    
+                    for i, chapter_text in enumerate(chapters):
+                        if chapter_text.strip():
+                            c = epub.EpubHtml(title=f'Chapter {i+1}', 
+                                            file_name=f'chapter_{i+1}.xhtml', 
+                                            lang='en')
+                            c.content = f'<html><body><p>{chapter_text.replace(chr(10), "</p><p>")}</p></body></html>'
+                            book.add_item(c)
+                    
+                    # Tartalomjegyzék
+                    book.toc = tuple(book.get_items_of_type(ebooklib.ITEM_DOCUMENT))
+                    book.add_item(epub.EpubNcx())
+                    book.add_item(epub.EpubNav())
+                    
+                    # Spine
+                    book.spine = ['nav'] + list(book.get_items_of_type(ebooklib.ITEM_DOCUMENT))
+                    
+                    epub.write_epub(str(output_path), book)
+                    return True
+                except Exception as e:
+                    raise Exception(f"EPUB creation error: {str(e)}")
+                    
+            success = await loop.run_in_executor(None, create_epub, text)
+            
+            if not success:
+                raise ConversionError("Failed to create EPUB")
+                
+            return {"converted": True}
+            
+        except Exception as e:
+            logger.error(f"Error converting TXT to EPUB: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Conversion failed: {str(e)}"
+            )
+
+    @staticmethod
+    async def _convert_rtf_to_docx(input_path: Path, output_path: Path) -> Dict[str, Any]:
+        """RTF → DOCX közvetlen konverzió"""
+        try:
+            # Először RTF → TXT
+            temp_txt = input_path.parent / f"temp_{input_path.stem}.txt"
+            await ConversionProcessor._convert_rtf_to_txt(input_path, temp_txt)
+            
+            # Aztán TXT → DOCX
+            result = await ConversionProcessor._convert_txt_to_docx(temp_txt, output_path)
+            
+            # Temp fájl törlése
+            try:
+                temp_txt.unlink()
+            except:
+                pass
+                
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error converting RTF to DOCX: {str(e)}")
             raise HTTPException(
                 status_code=500,
                 detail=f"Conversion failed: {str(e)}"
