@@ -327,6 +327,24 @@ class ConversionProcessor:
                 return await cls._convert_odt_to_txt(input_path, output_path)
             except Exception as e:
                 logger.warning(f"Pure Python ODT→TXT conversion failed: {str(e)}, trying external tools")
+        
+        if target_format == "txt" and source_format == "pdf":
+            try:
+                return await cls._convert_pdf_to_txt(input_path, output_path)
+            except Exception as e:
+                logger.warning(f"Pure Python PDF→TXT conversion failed: {str(e)}, trying external tools")
+        
+        if target_format == "txt" and source_format == "docx":
+            try:
+                return await cls._convert_docx_to_txt(input_path, output_path)
+            except Exception as e:
+                logger.warning(f"Pure Python DOCX→TXT conversion failed: {str(e)}, trying external tools")
+        
+        if target_format == "txt" and source_format == "rtf":
+            try:
+                return await cls._convert_rtf_to_txt(input_path, output_path)
+            except Exception as e:
+                logger.warning(f"Pure Python RTF→TXT conversion failed: {str(e)}, trying external tools")
 
         # 2. MÁSODLAGOS: LibreOffice (ha elérhető)
         try:
@@ -584,6 +602,106 @@ class ConversionProcessor:
             
         except Exception as e:
             logger.error(f"Error converting ODT to TXT: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Conversion failed: {str(e)}"
+            )
+
+    @staticmethod
+    async def _convert_pdf_to_txt(input_path: Path, output_path: Path) -> Dict[str, Any]:
+        """PDF → TXT közvetlen konverzió a PyMuPDF csomaggal"""
+        try:
+            import fitz  # PyMuPDF
+            
+            loop = asyncio.get_event_loop()
+            
+            def extract_pdf_text():
+                try:
+                    pdf = fitz.open(str(input_path))
+                    text = ""
+                    for page_num in range(len(pdf)):
+                        page = pdf[page_num]
+                        text += f"\n--- Oldal {page_num + 1} ---\n"
+                        text += page.get_text()
+                        text += "\n"
+                    pdf.close()
+                    return text
+                except Exception as e:
+                    raise Exception(f"PDF text extraction error: {str(e)}")
+                    
+            text = await loop.run_in_executor(None, extract_pdf_text)
+            
+            # TXT fájl mentése
+            async with aiofiles.open(output_path, 'w', encoding='utf-8') as f:
+                await f.write(text)
+                
+            return {"converted": True}
+            
+        except Exception as e:
+            logger.error(f"Error converting PDF to TXT: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Conversion failed: {str(e)}"
+            )
+
+    @staticmethod
+    async def _convert_docx_to_txt(input_path: Path, output_path: Path) -> Dict[str, Any]:
+        """DOCX → TXT közvetlen konverzió a python-docx csomaggal"""
+        try:
+            from docx import Document
+            
+            loop = asyncio.get_event_loop()
+            
+            def extract_docx_text():
+                try:
+                    doc = Document(str(input_path))
+                    paragraphs = [para.text for para in doc.paragraphs if para.text.strip()]
+                    return "\n".join(paragraphs)
+                except Exception as e:
+                    raise Exception(f"DOCX text extraction error: {str(e)}")
+                    
+            text = await loop.run_in_executor(None, extract_docx_text)
+            
+            # TXT fájl mentése
+            async with aiofiles.open(output_path, 'w', encoding='utf-8') as f:
+                await f.write(text)
+                
+            return {"converted": True}
+            
+        except Exception as e:
+            logger.error(f"Error converting DOCX to TXT: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Conversion failed: {str(e)}"
+            )
+
+    @staticmethod
+    async def _convert_rtf_to_txt(input_path: Path, output_path: Path) -> Dict[str, Any]:
+        """RTF → TXT közvetlen konverzió regex-alapú parsing-gal"""
+        try:
+            import re
+            
+            async with aiofiles.open(input_path, 'r', encoding='utf-8', errors='ignore') as f:
+                rtf_content = await f.read()
+            
+            # Egyszerű RTF parsing
+            # RTF vezérlő kódok eltávolítása
+            text = re.sub(r'\\[a-z]+\d*\s?', '', rtf_content)  # RTF commands
+            text = re.sub(r'[{}]', '', text)  # Braces
+            text = re.sub(r'\\\*.*?;', '', text)  # \* commands
+            text = re.sub(r'\\[\'"][0-9a-fA-F]{2}', '', text)  # Hex codes
+            text = re.sub(r'\r\n|\r|\n', '\n', text)  # Normalize line breaks
+            text = re.sub(r'\n+', '\n', text)  # Multiple newlines
+            text = text.strip()
+            
+            # TXT fájl mentése
+            async with aiofiles.open(output_path, 'w', encoding='utf-8') as f:
+                await f.write(text)
+                
+            return {"converted": True}
+            
+        except Exception as e:
+            logger.error(f"Error converting RTF to TXT: {str(e)}")
             raise HTTPException(
                 status_code=500,
                 detail=f"Conversion failed: {str(e)}"
