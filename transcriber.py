@@ -245,7 +245,7 @@ async def _transcribe_audio(audio_path: Path, identify_speakers: bool = False, f
         if audio_path.suffix.lower() not in [".mp3", ".wav", ".m4a", ".ogg", ".flac", ".opus"]:
             temp_mp3_path = audio_path.with_suffix(".mp3")
             logger.info(f"Converting {audio_path.name} to MP3...")
-            await loop.run_in_executor(None, audio.export, str(temp_mp3_path), format="mp3", bitrate="64k")
+            await loop.run_in_executor(None, lambda: audio.export(str(temp_mp3_path), format="mp3", bitrate="64k"))
             audio_file_to_transcribe = temp_mp3_path
             logger.info(f"Converted to {temp_mp3_path.name}")
         file_size_mb = audio_file_to_transcribe.stat().st_size / (1024*1024)
