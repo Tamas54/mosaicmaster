@@ -235,6 +235,7 @@ class ConversionProcessor:
             "odt": cls.process_odt,
             "txt": cls.process_txt,  # Hozzáadva a TXT feldolgozó
             "application/msword": cls.process_docx,  # DOC is handled by process_docx
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document": cls.process_docx,  # DOCX MIME type
             "image/jpeg": process_image,
             "image/png": process_image,
             "image/gif": process_image,
