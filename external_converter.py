@@ -2,8 +2,9 @@
 """
 Külső dokumentum konverter segédmodul problémás formátumokhoz
 DOC, PPT, PPTX, MOBI támogatás graceful fallback-ekkel
++ GPT-4o Vision OCR támogatás képekhez és PDF-ekhez
 
-TELJES IMPLEMENTÁCIÓ - a működő MOBI parser alapján
+TELJES IMPLEMENTÁCIÓ - a működő MOBI parser alapján + Vision OCR
 Railway-kompatibilis, minimális dependencies
 """
 
@@ -14,9 +15,14 @@ import shutil
 import subprocess
 import sys
 import struct
+import base64
+import os
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 import aiofiles
+from openai import OpenAI
+from PIL import Image
+from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +33,15 @@ HAS_PPT_SUPPORT = False
 HAS_MOBI_SUPPORT = False
 HAS_BEAUTIFULSOUP = False
 HAS_LIBREOFFICE = False
+HAS_VISION_OCR = False
+
+# OCR beállítások
+MODEL_NAME = "gpt-4o-mini"          # Vision-képes modell
+DETAIL_LEVEL = "high"               # "low" olcsóbb, de pontatlanabb lehet
+MAX_TOKENS = 8000                   # OCR-válasz hossz - 1-2 oldalnyi szöveghez
+
+# Támogatott képformátumok OCR-hez
+SUPPORTED_IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp', '.heic'}
 
 # MOBI támogatási módszerek
 MOBI_METHODS = []
@@ -89,6 +104,20 @@ except ImportError:
 
 HAS_MOBI_SUPPORT = len(MOBI_METHODS) > 0
 
+# OpenAI Vision OCR support
+try:
+    load_dotenv()
+    if os.getenv("OPENAI_API_KEY"):
+        openai_client = OpenAI()
+        HAS_VISION_OCR = True
+        logger.info("OpenAI Vision OCR support available")
+    else:
+        logger.warning("OpenAI Vision OCR disabled - missing OPENAI_API_KEY")
+        openai_client = None
+except Exception as e:
+    logger.warning(f"OpenAI Vision OCR disabled - {str(e)}")
+    openai_client = None
+
 # LibreOffice support disabled for Railway deployment
 HAS_LIBREOFFICE = False
 logger.info("LibreOffice support disabled for Railway deployment")
@@ -97,6 +126,91 @@ logger.info("LibreOffice support disabled for Railway deployment")
 class ExternalConverterHelper:
     """Külső konverter segédosztály problémás formátumokhoz"""
     
+    @staticmethod
+    def _image_to_base64(image_path: Path) -> str:
+        """
+        Betölt egy képet, biztosítja a JPEG/PNG formátumot, és base64-re kódolja.
+        """
+        # Ha nem JPEG/PNG, konvertáljuk (pl. HEIC → JPEG) a PIL segítségével
+        if image_path.suffix.lower() not in {".jpg", ".jpeg", ".png"}:
+            img = Image.open(image_path)
+            temp_path = image_path.with_suffix(".jpg")
+            img.save(temp_path, format="JPEG", quality=95)
+            image_path = temp_path
+
+        with open(image_path, "rb") as f:
+            return base64.b64encode(f.read()).decode("utf-8")
+    
+    @staticmethod
+    async def ocr_image_with_vision(input_path: Path, output_path: Path, language_hint: str = "any language") -> Dict[str, Any]:
+        """Kép OCR feldolgozása GPT-4o Vision segítségével"""
+        if not HAS_VISION_OCR:
+            raise RuntimeError("Vision OCR support not available - missing OpenAI API key")
+        
+        try:
+            loop = asyncio.get_event_loop()
+            
+            def process_with_vision():
+                try:
+                    logger.debug(f"Processing image with Vision OCR: {input_path}")
+                    
+                    # Kép base64 kódolása
+                    b64_image = ExternalConverterHelper._image_to_base64(input_path)
+                    
+                    # OCR kérés Vision API-hoz - multilingual támogatással
+                    if language_hint == "any language":
+                        prompt_text = "Please read and transcribe ALL text visible in this image exactly as you see it. The text may be in ANY language (including but not limited to: English, Hungarian, German, French, Spanish, Italian, Russian, Chinese, Japanese, Korean, Arabic, Hindi, Portuguese, Dutch, Swedish, Norwegian, Danish, Finnish, Polish, Czech, Turkish, Greek, Hebrew, Thai, Vietnamese, Indonesian, and many others). Preserve the original formatting, line breaks, and layout as much as possible. If there's no text in the image, describe what you see."
+                    else:
+                        prompt_text = f"Please read and transcribe ALL text visible in this image exactly as you see it. The text is expected to be in {language_hint}. Preserve the original formatting and layout. If there's no text in the image, describe what you see."
+                    
+                    response = openai_client.chat.completions.create(
+                        model=MODEL_NAME,
+                        max_tokens=MAX_TOKENS,
+                        messages=[
+                            {
+                                "role": "user",
+                                "content": [
+                                    {"type": "text", "text": prompt_text},
+                                    {
+                                        "type": "image_url",
+                                        "image_url": {
+                                            "url": f"data:image/jpeg;base64,{b64_image}",
+                                            "detail": DETAIL_LEVEL
+                                        },
+                                    },
+                                ],
+                            }
+                        ],
+                    )
+                    
+                    # Eredmény kivonása
+                    ocr_text = response.choices[0].message.content.strip()
+                    
+                    # Token használat logolása
+                    if hasattr(response, 'usage') and response.usage:
+                        usage = response.usage
+                        logger.info(f"Vision OCR token usage: {usage.prompt_tokens} prompt + {usage.completion_tokens} completion = {usage.total_tokens} total")
+                    
+                    logger.info(f"Vision OCR extraction successful - {len(ocr_text)} characters")
+                    return ocr_text
+                    
+                except Exception as e:
+                    logger.error(f"Vision OCR processing failed: {str(e)}")
+                    raise Exception(f"Vision OCR processing failed: {str(e)}")
+            
+            # Aszinkron feldolgozás
+            text = await loop.run_in_executor(None, process_with_vision)
+            
+            # TXT fájl mentése
+            async with aiofiles.open(output_path, 'w', encoding='utf-8') as f:
+                await f.write(text)
+                
+            return {"converted": True, "method": "vision_ocr", "characters": len(text)}
+            
+        except Exception as e:
+            logger.error(f"Vision OCR conversion error: {str(e)}")
+            raise Exception(f"Vision OCR conversion failed: {str(e)}")
+
     @staticmethod
     async def convert_doc_to_txt(input_path: Path, output_path: Path) -> Dict[str, Any]:
         """DOC → TXT konverzió docx2txt vagy olefile használatával"""
@@ -501,7 +615,8 @@ class ExternalConverterHelper:
             "doc": HAS_DOC_SUPPORT,
             "pptx": HAS_PPTX_SUPPORT,
             "ppt": HAS_PPT_SUPPORT,
-            "mobi": HAS_MOBI_SUPPORT
+            "mobi": HAS_MOBI_SUPPORT,
+            "vision_ocr": HAS_VISION_OCR
         }
 
     @staticmethod
@@ -529,6 +644,10 @@ class ExternalConverterHelper:
             missing_packages["ebooklib"] = "pip install ebooklib"
             recommendations.append("MOBI files: Install 'mobi' or 'ebooklib' package")
             
+        if not HAS_VISION_OCR:
+            missing_packages["openai"] = "pip install openai"
+            recommendations.append("Vision OCR for images: Set OPENAI_API_KEY environment variable")
+            
         return {
             "available_features": available,
             "missing_packages": missing_packages,
@@ -536,7 +655,8 @@ class ExternalConverterHelper:
             "package_versions": PACKAGE_VERSIONS,
             "mobi_methods": MOBI_METHODS,
             "beautifulsoup_available": HAS_BEAUTIFULSOUP,
-            "libreoffice_available": HAS_LIBREOFFICE
+            "libreoffice_available": HAS_LIBREOFFICE,
+            "vision_ocr_available": HAS_VISION_OCR
         }
 
     @staticmethod
@@ -545,8 +665,8 @@ class ExternalConverterHelper:
         available = ExternalConverterHelper.get_available_conversions()
         supported_formats = [fmt.upper() for fmt, sup in available.items() if sup]
         
-        if len(supported_formats) == 4:
-            return "All advanced formats supported (DOC, PPTX, PPT, MOBI) - Railway compatible"
+        if len(supported_formats) == 5:
+            return "All advanced formats supported (DOC, PPTX, PPT, MOBI, VISION_OCR) - Railway compatible"
         elif len(supported_formats) > 0:
             return f"Advanced format support: {', '.join(supported_formats)} - Railway compatible"
         else:
@@ -554,7 +674,7 @@ class ExternalConverterHelper:
 
 
 # Convenience functions for document_processor.py integration
-async def try_convert_external(source_format: str, input_path: Path, output_path: Path) -> Optional[Dict[str, Any]]:
+async def try_convert_external(source_format: str, input_path: Path, output_path: Path, **kwargs) -> Optional[Dict[str, Any]]:
     """
     Megpróbálja konvertálni a fájlt külső helperrel
     Returns None ha nem támogatott, egyébként a konverzió eredménye
@@ -570,12 +690,37 @@ async def try_convert_external(source_format: str, input_path: Path, output_path
             return await ExternalConverterHelper.convert_ppt_to_txt(input_path, output_path)
         elif source_format == "mobi" and HAS_MOBI_SUPPORT:
             return await ExternalConverterHelper.convert_mobi_to_txt(input_path, output_path)
+        elif source_format in ["image", "pdf_image"] and HAS_VISION_OCR:
+            # Képformátumok és PDF-ek Vision OCR-rel
+            language_hint = kwargs.get("language_hint", "any language")
+            return await ExternalConverterHelper.ocr_image_with_vision(input_path, output_path, language_hint)
         else:
             logger.debug(f"External conversion not available for {source_format}")
             return None
             
     except Exception as e:
         logger.warning(f"External conversion failed for {source_format}: {str(e)}")
+        return None
+
+async def try_ocr_image(input_path: Path, output_path: Path, language_hint: str = "any language") -> Optional[Dict[str, Any]]:
+    """
+    Képek OCR feldolgozása Vision API-val
+    Returns None ha nem támogatott, egyébként a konverzió eredménye
+    """
+    try:
+        # Ellenőrizzük, hogy képfájl-e
+        if input_path.suffix.lower() not in SUPPORTED_IMAGE_EXTENSIONS:
+            logger.debug(f"File extension {input_path.suffix} not supported for OCR")
+            return None
+            
+        if not HAS_VISION_OCR:
+            logger.debug("Vision OCR not available")
+            return None
+            
+        return await ExternalConverterHelper.ocr_image_with_vision(input_path, output_path, language_hint)
+        
+    except Exception as e:
+        logger.warning(f"OCR processing failed: {str(e)}")
         return None
 
 

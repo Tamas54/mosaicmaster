@@ -26,7 +26,9 @@ from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 from PIL import Image
-import pytesseract
+
+# Local imports
+from external_converter import try_ocr_image
 
 # Conditional imports
 try:
@@ -66,9 +68,6 @@ class ExternalToolError(Exception):
     """Külső eszközök (Calibre, LibreOffice) hibája"""
     pass
 
-class OCRError(Exception):
-    """OCR feldolgozási hiba"""
-    pass
 
 class TempDirectoryManager:
     """Ideiglenes könyvtárak kezelése automatikus tisztítással"""
@@ -159,51 +158,34 @@ class TempDirectoryManager:
 # Globális TempDirectoryManager példány
 temp_manager = TempDirectoryManager(TEMP_DIR, MAX_TEMP_DIR_AGE_HOURS)
 
-async def process_image(file_path: Path, preserve_format: bool = False) -> Tuple[str, Dict[str, Any]]:
-    """Képfeldolgozás OCR segítségével - JAVÍTOTT MPO támogatással"""
+async def process_image_with_ocr(file_path: Path, preserve_format: bool = False) -> Tuple[str, Dict[str, Any]]:
+    """Képfeldolgozás Vision OCR segítségével az external_converter használatával"""
     try:
-        loop = asyncio.get_event_loop()
+        # Ideiglenes fájl létrehozása az OCR eredménynek
+        temp_txt_path = file_path.with_suffix('.ocr.txt')
         
-        def run_ocr():
-            try:
-                # Képet megnyitjuk
-                img = Image.open(file_path)
-                
-                # MPO és más nem támogatott formátumok konvertálása
-                if hasattr(img, 'format') and img.format and img.format.upper() not in ['JPEG', 'JPG', 'PNG', 'GIF', 'BMP', 'TIFF']:
-                    logger.info(f"Converting image from {img.format} format to JPEG format")
-                    
-                    # Konvertálás RGB-re (ha szükséges)
-                    if img.mode != 'RGB':
-                        img = img.convert('RGB')
-                    
-                    # Ideiglenes fájl létrehozása a konvertált képnek
-                    temp_jpg_path = file_path.with_suffix('.converted.jpg')
-                    img.save(temp_jpg_path, format='JPEG', quality=95)
-                    
-                    # Újra megnyitjuk a konvertált képet
-                    img = Image.open(temp_jpg_path)
-                
-                # OCR futtatása több nyelvvel a jobb eredmény érdekében
-                try:
-                    result = pytesseract.image_to_string(img, lang='eng+hun+deu+fra+spa+ita+rus')
-                except:
-                    # Fallback: csak angol
-                    result = pytesseract.image_to_string(img)
-                
-                return result
-            except Exception as e:
-                logger.error(f"OCR error details: {str(e)}")
-                raise OCRError(f"OCR processing failed: {str(e)}")
-                
-        text = await loop.run_in_executor(None, run_ocr)
-        return text, {"type": "image"}
-    except OCRError as e:
-        logger.error(f"OCR error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        # OCR feldolgozás az external_converter segítségével
+        result = await try_ocr_image(file_path, temp_txt_path)
+        
+        if result is None:
+            raise HTTPException(status_code=500, detail="OCR processing not available or failed")
+        
+        # OCR szöveg beolvasása
+        async with aiofiles.open(temp_txt_path, 'r', encoding='utf-8') as f:
+            text = await f.read()
+        
+        # Ideiglenes fájl törlése
+        try:
+            temp_txt_path.unlink(missing_ok=True)
+        except:
+            pass
+        
+        return text, {"type": "image", "method": result.get("method", "vision_ocr")}
+        
     except Exception as e:
-        logger.error(f"Error processing image: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Image processing failed: {str(e)}")
+        logger.error(f"Error processing image with OCR: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Image OCR processing failed: {str(e)}")
+
 
 class ConversionProcessor:
     """Dokumentum konverziós osztály"""
@@ -237,9 +219,9 @@ class ConversionProcessor:
             "txt": cls.process_txt,  # Hozzáadva a TXT feldolgozó
             "application/msword": cls.process_docx,  # DOC is handled by process_docx
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document": cls.process_docx,  # DOCX MIME type
-            "image/jpeg": process_image,
-            "image/png": process_image,
-            "image/gif": process_image,
+            "image/jpeg": process_image_with_ocr,
+            "image/png": process_image_with_ocr,
+            "image/gif": process_image_with_ocr,
         }
 
         # Megpróbáljuk normalizálni a file_type-ot, ha szükséges
@@ -266,10 +248,41 @@ class ConversionProcessor:
 
         # Képek OCR feldolgozása
         if source_format in ["image/jpeg", "image/png", "image/gif"]:
-            text, _ = await process_image(input_path)
-            async with aiofiles.open(output_path, "w", encoding="utf-8") as f:
+            text, _ = await process_image_with_ocr(input_path)
+            
+            # Ha TXT a cél, egyszerűen mentjük a szöveget
+            if target_format == "txt":
+                async with aiofiles.open(output_path, "w", encoding="utf-8") as f:
+                    await f.write(text)
+                return {"converted_text": text}
+            
+            # Egyéb formátumok esetén ideiglenes TXT fájlt hozunk létre és konvertáljuk
+            temp_txt = input_path.parent / f"{input_path.stem}_ocr_temp.txt"
+            async with aiofiles.open(temp_txt, "w", encoding="utf-8") as f:
                 await f.write(text)
-            return {"converted_text": text}
+            
+            try:
+                if target_format == "pdf":
+                    result = await cls._convert_txt_to_pdf(temp_txt, output_path)
+                elif target_format == "docx":
+                    result = await cls._convert_txt_to_docx(temp_txt, output_path)
+                elif target_format == "epub":
+                    result = await cls._convert_txt_to_epub(temp_txt, output_path)
+                elif target_format == "odt":
+                    result = await cls._convert_txt_to_odt(temp_txt, output_path)
+                elif target_format in ["srt", "sub", "vtt"]:
+                    result = await cls._convert_to_srt(temp_txt, output_path, "txt")
+                else:
+                    # Nem támogatott formátum esetén TXT-ként mentjük
+                    async with aiofiles.open(output_path, "w", encoding="utf-8") as f:
+                        await f.write(text)
+                    result = {"converted_text": text}
+                
+                return result
+            finally:
+                # Ideiglenes fájl törlése
+                if temp_txt.exists():
+                    temp_txt.unlink()
 
         # Speciális konverziók kezelése
         if source_format == "odt" and target_format == "rtf":
@@ -1343,6 +1356,53 @@ class ConversionProcessor:
             )
 
     @staticmethod
+    async def _convert_txt_to_odt(input_path: Path, output_path: Path) -> Dict[str, Any]:
+        """TXT → ODT konverzió"""
+        if not HAS_ODF:
+            raise HTTPException(
+                status_code=500,
+                detail="odfpy is not installed. Please install it via 'pip install odfpy'"
+            )
+            
+        try:
+            async with aiofiles.open(input_path, "r", encoding="utf-8") as f:
+                content = await f.read()
+
+            loop = asyncio.get_event_loop()
+            
+            def convert_txt_to_odt_sync():
+                from odf.opendocument import OpenDocumentText
+                from odf.text import P
+                
+                doc = OpenDocumentText()
+                
+                # Szöveg bekezdésekre bontása
+                paragraphs = content.split('\n')
+                
+                for para_text in paragraphs:
+                    if para_text.strip():
+                        # Nem üres bekezdés hozzáadása
+                        para = P(text=para_text.strip())
+                        doc.text.addElement(para)
+                    else:
+                        # Üres sor hozzáadása
+                        para = P(text="")
+                        doc.text.addElement(para)
+
+                doc.save(str(output_path))
+                return True
+                
+            await loop.run_in_executor(None, convert_txt_to_odt_sync)
+            return {"converted": True}
+
+        except Exception as e:
+            logger.error(f"Error converting TXT to ODT: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"TXT to ODT conversion failed: {str(e)}"
+            )
+
+    @staticmethod
     async def _convert_pdf_to_epub_chunked(input_path: Path, output_path: Path) -> Dict[str, Any]:
         """PDF → EPUB konverzió nagy fájlokhoz optimalizálva, darabolt feldolgozással - JAVÍTOTT"""
         try:
@@ -1976,7 +2036,7 @@ async def ocr_image(
             
             # OCR feldolgozás
             try:
-                text, _ = await process_image(input_path)
+                text, _ = await process_image_with_ocr(input_path)
             except HTTPException as e:
                 # Pontos hibainformáció átadása a kliensnek
                 await manager.send_progress(connection_id, 100, f"OCR Error: {e.detail}")
@@ -2379,7 +2439,7 @@ def process_ocr(file_path: str, language: str = 'hun+eng') -> str:
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
-        result = loop.run_until_complete(process_image(file_path))
+        result = loop.run_until_complete(process_image_with_ocr(file_path))
         return result[0]  # Return just the text part
     finally:
         loop.close()
