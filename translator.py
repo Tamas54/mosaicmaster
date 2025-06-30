@@ -43,7 +43,7 @@ async def translate_chunks(chunks: List[str], target_lang: str, connection_id: s
             try:
                 response = await asyncio.wait_for(
                     client.chat.completions.create(
-                        model=os.getenv("MODEL_NAME", "gpt-3.5-turbo"),
+                        model=os.getenv("MODEL_NAME", "gpt-4o-mini"),
                         messages=[
                             {
                                 "role": "system",
@@ -87,7 +87,7 @@ async def summarize_translated_text(text: str, connection_id: str) -> str:
         await manager.send_progress(connection_id, 92, "Generating AI summary...")
         
         response = await client.chat.completions.create(
-            model=os.getenv("MODEL_NAME", "gpt-3.5-turbo"),
+            model=os.getenv("MODEL_NAME", "gpt-4o-mini"),
             messages=[
                 {
                     "role": "system",
@@ -247,8 +247,8 @@ async def translate_content(
                 # Képfájlok kezelése OCR-rel
                 if file_type.startswith("image/"):
                     try:
-                        from document_processor import process_image
-                        content_to_translate, format_info = await process_image(file_path)
+                        from document_processor import process_image_with_ocr
+                        content_to_translate, format_info = await process_image_with_ocr(file_path)
                     except ImportError:
                         raise HTTPException(
                             status_code=400, 
