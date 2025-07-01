@@ -541,7 +541,48 @@ class VideoDownloader:
                     # Ha nem sikerül a másolás, visszaadjuk az eredeti fájlt
                     return temp_output_path
             
-            # Ha nem sikerült, próbáljuk meg parancssorból futtatni yt-dlp
+            # Ha nem sikerült a retry-okkal, próbáljunk Railway-specifikus egyszerű konfigurációval
+            if not success:
+                await self.send_progress(50, "Railway-specifikus letöltési kísérlet...")
+                
+                # Minimális konfiguráció Railway szerverre
+                simple_ydl_opts = {
+                    'format': 'worst/best',  # Kisebb fájl Railway-re
+                    'outtmpl': str(temp_output_path),
+                    'noplaylist': True,
+                    'quiet': True,
+                    'no_warnings': True,
+                    'ignoreerrors': True,
+                    'extractor_args': {
+                        'youtube': {
+                            'player_client': ['android'],  # Csak Android client
+                        }
+                    }
+                }
+                
+                with ThreadPoolExecutor() as executor:
+                    def run_simple_yt_dlp():
+                        try:
+                            with yt_dlp.YoutubeDL(simple_ydl_opts) as ydl:
+                                ydl.download([url])
+                            return True
+                        except Exception as e:
+                            logger.warning(f"Simple yt-dlp failed: {e}")
+                            return False
+                            
+                    success = await loop.run_in_executor(executor, run_simple_yt_dlp)
+                
+                if success and temp_output_path.exists() and temp_output_path.stat().st_size > 0:
+                    try:
+                        shutil.copy2(temp_output_path, system_output_path)
+                        await self.send_progress(100, "Letöltés sikeres (egyszerű mód)!")
+                        logger.info(f"[{self.connection_id}] Sikeres egyszerű letöltés: {system_output_path}")
+                        return temp_output_path
+                    except Exception as e:
+                        logger.error(f"Hiba a fájl másolása közben: {e}")
+                        return temp_output_path
+            
+            # Ha még mindig nem sikerült, próbáljuk meg parancssorból futtatni yt-dlp
             await self.send_progress(60, "Letöltés alternatív módon...")
             
             # Alapvető parancs összeállítása
@@ -597,10 +638,13 @@ class VideoDownloader:
             # Itt egy egyszerűbb megoldással próbálkozunk
             try:
                 final_cmd = [
-                    "youtube-dl",  # Alternatív eszköz
+                    "yt-dlp",  # Modern eszköz Railway szerveren
                     "-f", "best",
                     "-o", str(temp_output_path),
                     "--no-check-certificate",
+                    "--extractor-args", "youtube:player_client=android",
+                    "--user-agent", random.choice(USER_AGENTS),
+                    "--cookies", str(self.cookies_dir / "cookies.txt"),
                     url
                 ]
                 
