@@ -301,14 +301,20 @@ class ConversionProcessor:
         if target_format == "srt":
             return await cls._convert_to_srt(input_path, output_path, source_format)
 
-        # Egyedi kezelés DOCX generálása esetén
+        # Egyedi kezelés DOCX/DOC generálása esetén
         # 1. ELSŐDLEGES: Pure Python konverziók
-        if target_format == "docx" and source_format != "docx":
+        if target_format in ["docx", "doc"] and source_format not in ["docx", "doc"]:
             try:
                 if source_format == "txt":
-                    return await cls._convert_txt_to_docx(input_path, output_path)
+                    if target_format == "docx":
+                        return await cls._convert_txt_to_docx(input_path, output_path)
+                    else:  # target_format == "doc"
+                        return await cls._convert_txt_to_doc(input_path, output_path)
                 elif source_format == "pdf":
-                    return await cls._convert_pdf_to_docx(input_path, output_path)
+                    if target_format == "docx":
+                        return await cls._convert_pdf_to_docx(input_path, output_path)
+                    else:  # target_format == "doc"
+                        return await cls._convert_pdf_to_doc(input_path, output_path)
             except Exception as e:
                 logger.warning(f"Pure Python conversion failed: {str(e)}, trying external tools")
         
@@ -847,6 +853,43 @@ class ConversionProcessor:
             )
 
     @staticmethod
+    async def _convert_txt_to_doc(input_path: Path, output_path: Path) -> Dict[str, Any]:
+        """TXT → DOC közvetlen konverzió a Python docx csomaggal (DOC és DOCX formátum ugyanaz)"""
+        try:
+            async with aiofiles.open(input_path, 'r', encoding='utf-8', errors='ignore') as f:
+                text = await f.read()
+            
+            loop = asyncio.get_event_loop()
+            
+            def create_doc(text_content):
+                doc = Document()
+                
+                # Soronként adjuk hozzá a szöveget, hogy az ékezetek és formázás megmaradjon
+                paragraphs = text_content.split('\n')
+                for para in paragraphs:
+                    if para.strip():
+                        doc.add_paragraph(para)
+                    else:
+                        doc.add_paragraph()  # Üres bekezdés
+                        
+                doc.save(str(output_path))
+                return True
+                
+            success = await loop.run_in_executor(None, create_doc, text)
+            
+            if not success:
+                raise ConversionError("Failed to create DOC")
+                
+            return {"converted": True}
+            
+        except Exception as e:
+            logger.error(f"Error converting TXT to DOC: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Conversion failed: {str(e)}"
+            )
+
+    @staticmethod
     async def _convert_txt_to_pdf(input_path: Path, output_path: Path) -> Dict[str, Any]:
         """TXT → PDF közvetlen konverzió a ReportLab csomaggal"""
         try:
@@ -1310,6 +1353,50 @@ class ConversionProcessor:
             
         except Exception as e:
             logger.error(f"Error converting PDF to DOCX: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Conversion failed: {str(e)}"
+            )
+
+    @staticmethod
+    async def _convert_pdf_to_doc(input_path: Path, output_path: Path) -> Dict[str, Any]:
+        """PDF → DOC közvetlen konverzió a PyMuPDF és Python docx csomagokkal"""
+        try:
+            loop = asyncio.get_event_loop()
+            
+            def extract_and_create_doc():
+                try:
+                    pdf = fitz.open(str(input_path))
+                    doc = Document()
+                    
+                    for page_num in range(len(pdf)):
+                        page = pdf[page_num]
+                        text = page.get_text()
+                        
+                        # Oldalcím hozzáadása
+                        doc.add_heading(f"Oldal {page_num + 1}", level=1)
+                        
+                        # Bekezdések hozzáadása
+                        paragraphs = text.split('\n\n')
+                        for para in paragraphs:
+                            if para.strip():
+                                doc.add_paragraph(para)
+                    
+                    doc.save(str(output_path))
+                    return True
+                except Exception as e:
+                    logger.error(f"PDF to DOC conversion error: {str(e)}")
+                    return False
+            
+            success = await loop.run_in_executor(None, extract_and_create_doc)
+            
+            if not success:
+                raise ConversionError("Failed to convert PDF to DOC")
+                
+            return {"converted": True}
+            
+        except Exception as e:
+            logger.error(f"Error converting PDF to DOC: {str(e)}")
             raise HTTPException(
                 status_code=500,
                 detail=f"Conversion failed: {str(e)}"
