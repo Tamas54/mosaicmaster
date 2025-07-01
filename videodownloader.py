@@ -434,7 +434,21 @@ class VideoDownloader:
             # yt-dlp használata (legrobusztusabb megoldás)
             await self.send_progress(20, "Letöltés yt-dlp segítségével...")
             
-            # YouTube specifikus yt-dlp beállítások a botelhárítás kivédésére
+            # YouTube specifikus intelligent letöltés
+            if platform == "youtube":
+                # Először próbáljuk a smart diagnosztikai letöltést
+                await self.send_progress(15, "🧠 Smart YouTube diagnosztika...")
+                smart_result = await self.smart_youtube_download(url)
+                
+                if smart_result and smart_result.exists() and smart_result.stat().st_size > 0:
+                    logger.info(f"[{self.connection_id}] Smart YouTube letöltés sikeres!")
+                    return smart_result
+                
+                # Ha a smart letöltés nem sikerült, folytatjuk a klasszikus módszerrel
+                await self.send_progress(20, "🔄 Fallback módszer...")
+                logger.warning(f"[{self.connection_id}] Smart letöltés sikertelen, klasszikus módszer...")
+            
+            # Klasszikus yt-dlp beállítások (YouTube + egyéb platformok)
             if platform == "youtube":
                 extra_options = {
                     'cookiefile': str(self.cookies_dir / "cookies.txt"),
@@ -681,6 +695,373 @@ class VideoDownloader:
             await self.send_progress(100, f"Hiba: {str(e)}")
             return None
     
+    async def diagnose_ytdlp_system(self) -> Dict[str, Any]:
+        """yt-dlp rendszer diagnosztikája Railway szerveren"""
+        
+        await self.send_progress(5, "🔍 yt-dlp rendszer diagnosztika...")
+        
+        diagnosis = {
+            'yt_dlp_version': None,
+            'youtube_dl_version': None,
+            'python_version': __import__('sys').version,
+            'ffmpeg_available': False,
+            'working_extractors': [],
+            'recommended_config': None
+        }
+        
+        # 1. yt-dlp verzió ellenőrzés
+        try:
+            result = await asyncio.create_subprocess_exec(
+                'yt-dlp', '--version',
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, stderr = await result.communicate()
+            if result.returncode == 0:
+                diagnosis['yt_dlp_version'] = stdout.decode().strip()
+                logger.info(f"[{self.connection_id}] yt-dlp verzió: {diagnosis['yt_dlp_version']}")
+        except Exception as e:
+            diagnosis['yt_dlp_version'] = "NOT_FOUND"
+            logger.warning(f"[{self.connection_id}] yt-dlp nem található: {e}")
+        
+        # 2. youtube-dl backup
+        try:
+            result = await asyncio.create_subprocess_exec(
+                'youtube-dl', '--version',
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, stderr = await result.communicate()
+            if result.returncode == 0:
+                diagnosis['youtube_dl_version'] = stdout.decode().strip()
+        except Exception:
+            diagnosis['youtube_dl_version'] = "NOT_FOUND"
+        
+        # 3. FFmpeg
+        try:
+            result = await asyncio.create_subprocess_exec(
+                'ffmpeg', '-version',
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, stderr = await result.communicate()
+            diagnosis['ffmpeg_available'] = result.returncode == 0
+        except Exception:
+            diagnosis['ffmpeg_available'] = False
+        
+        await self.send_progress(15, "📊 Rendszer információk összegyűjtve")
+        
+        # 4. Ha yt-dlp nem található vagy régi, próbáljunk frissíteni
+        if diagnosis['yt_dlp_version'] in ['NOT_FOUND', None] or 'error' in diagnosis.get('yt_dlp_version', '').lower():
+            await self.send_progress(17, "🔄 yt-dlp frissítés szükséges...")
+            update_success = await self.force_update_ytdlp()
+            
+            if update_success:
+                # Verzió újra ellenőrzése frissítés után
+                try:
+                    result = await asyncio.create_subprocess_exec(
+                        'yt-dlp', '--version',
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE
+                    )
+                    stdout, stderr = await result.communicate()
+                    if result.returncode == 0:
+                        diagnosis['yt_dlp_version'] = stdout.decode().strip()
+                        logger.info(f"[{self.connection_id}] yt-dlp frissítve: {diagnosis['yt_dlp_version']}")
+                except Exception:
+                    logger.warning(f"[{self.connection_id}] yt-dlp frissítés után verzió ellenőrzés sikertelen")
+        
+        return diagnosis
+
+    async def force_update_ytdlp(self) -> bool:
+        """yt-dlp erőszakos frissítése Railway szerveren"""
+        
+        await self.send_progress(18, "🔧 yt-dlp force update...")
+        
+        update_methods = [
+            # Method 1: pip upgrade
+            ['pip', 'install', '--upgrade', '--force-reinstall', 'yt-dlp'],
+            
+            # Method 2: specific version
+            ['pip', 'install', '--upgrade', 'yt-dlp>=2024.7.1'],
+            
+            # Method 3: self update
+            ['yt-dlp', '-U'],
+            
+            # Method 4: fresh install after uninstall
+            ['pip', 'uninstall', '-y', 'yt-dlp']
+        ]
+        
+        for i, method in enumerate(update_methods):
+            try:
+                logger.info(f"[{self.connection_id}] Update módszer #{i+1}: {' '.join(method)}")
+                
+                process = await asyncio.create_subprocess_exec(
+                    *method,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                
+                stdout, stderr = await process.communicate()
+                
+                if process.returncode == 0:
+                    logger.info(f"[{self.connection_id}] ✅ yt-dlp frissítés sikeres (módszer #{i+1})")
+                    
+                    # Ha ez volt az uninstall, most újra telepítjük
+                    if 'uninstall' in method[1]:
+                        install_process = await asyncio.create_subprocess_exec(
+                            'pip', 'install', 'yt-dlp>=2024.7.1',
+                            stdout=asyncio.subprocess.PIPE,
+                            stderr=asyncio.subprocess.PIPE
+                        )
+                        await install_process.communicate()
+                        if install_process.returncode == 0:
+                            logger.info(f"[{self.connection_id}] ✅ yt-dlp újratelepítés sikeres")
+                            return True
+                    else:
+                        return True
+                    
+            except Exception as e:
+                logger.warning(f"[{self.connection_id}] Update módszer {i+1} hiba: {e}")
+                continue
+        
+        logger.error(f"[{self.connection_id}] ❌ Minden yt-dlp frissítési módszer sikertelen")
+        return False
+    
+    async def test_youtube_extractors(self, test_url: str) -> Dict[str, bool]:
+        """Különböző YouTube extractor-ok tesztelése Railway környezetben"""
+        
+        await self.send_progress(20, "🧪 Extractor tesztek futtatása...")
+        
+        extractors_to_test = [
+            {
+                'name': 'minimal_basic',
+                'args': []  # Legegyszerűbb - csak title check
+            },
+            {
+                'name': 'android_simple',
+                'args': ['--extractor-args', 'youtube:player_client=android']
+            },
+            {
+                'name': 'ios_simple', 
+                'args': ['--extractor-args', 'youtube:player_client=ios']
+            },
+            {
+                'name': 'tv_simple',
+                'args': ['--extractor-args', 'youtube:player_client=tv']
+            },
+            {
+                'name': 'web_simple',
+                'args': ['--extractor-args', 'youtube:player_client=web']
+            }
+        ]
+        
+        results = {}
+        
+        for i, extractor in enumerate(extractors_to_test):
+            try:
+                await self.send_progress(25 + i*8, f"🔍 Teszt: {extractor['name']}")
+                
+                cmd = [
+                    'yt-dlp',
+                    '--no-download',
+                    '--get-title',
+                    '--socket-timeout', '20',
+                    '--retries', '2',
+                    '--no-check-certificate'
+                ] + extractor['args'] + [test_url]
+                
+                process = await asyncio.create_subprocess_exec(
+                    *cmd,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                
+                stdout, stderr = await process.communicate()
+                
+                results[extractor['name']] = process.returncode == 0
+                
+                if process.returncode == 0:
+                    logger.info(f"[{self.connection_id}] ✅ {extractor['name']} működik!")
+                else:
+                    logger.warning(f"[{self.connection_id}] ❌ {extractor['name']} hiba: {stderr.decode()[:100]}")
+                    
+            except Exception as e:
+                results[extractor['name']] = False
+                logger.warning(f"[{self.connection_id}] ❌ {extractor['name']} kivétel: {e}")
+        
+        return results
+    
+    async def create_optimal_config(self, working_extractors: Dict[str, bool]) -> Optional[Dict]:
+        """Optimális yt-dlp konfiguráció létrehozása a tesztek alapján"""
+        
+        await self.send_progress(65, "⚙️ Optimális konfiguráció meghatározása...")
+        
+        # Priority order: minimal_basic > android > ios > tv > web
+        if working_extractors.get('minimal_basic'):
+            logger.info(f"[{self.connection_id}] Optimális: Minimal basic")
+            return {
+                'format': 'best',  # Egyszerű best formátum
+                'method': 'minimal_basic',
+                'additional_args': {
+                    'socket_timeout': 30,
+                    'retries': 3,
+                    'nocheckcertificate': True
+                }
+            }
+        elif working_extractors.get('android_simple'):
+            logger.info(f"[{self.connection_id}] Optimális: Android client")
+            return {
+                'extractor_args': {'youtube': {'player_client': ['android'], 'formats': ['missing_pot']}},
+                'format': 'worst[height<=360]/worst/18/17',
+                'method': 'android_simple',
+                'additional_args': {
+                    'socket_timeout': 15,
+                    'retries': 2,
+                    'nocheckcertificate': True
+                }
+            }
+        elif working_extractors.get('ios_simple'):
+            logger.info(f"[{self.connection_id}] Optimális: iOS client")
+            return {
+                'extractor_args': {'youtube': {'player_client': ['ios']}},
+                'format': 'worst[height<=240]/worst/18/17',
+                'method': 'ios_simple',
+                'additional_args': {
+                    'socket_timeout': 15,
+                    'retries': 2,
+                    'nocheckcertificate': True
+                }
+            }
+        elif working_extractors.get('tv_simple'):
+            logger.info(f"[{self.connection_id}] Optimális: TV client")
+            return {
+                'extractor_args': {'youtube': {'player_client': ['tv']}},
+                'format': 'worst[height<=240]/18/17/36',
+                'method': 'tv_simple',
+                'additional_args': {
+                    'socket_timeout': 20,
+                    'retries': 3,
+                    'nocheckcertificate': True
+                }
+            }
+        elif working_extractors.get('legacy_format'):
+            logger.info(f"[{self.connection_id}] Optimális: Legacy formátum")
+            return {
+                'format': '18/17/36/5',
+                'method': 'legacy_format',
+                'additional_args': {
+                    'socket_timeout': 20,
+                    'retries': 3,
+                    'nocheckcertificate': True
+                }
+            }
+        elif working_extractors.get('minimal_config'):
+            logger.info(f"[{self.connection_id}] Optimális: Minimális konfiguráció")
+            return {
+                'format': 'worst',
+                'method': 'minimal_config',
+                'additional_args': {
+                    'socket_timeout': 30,
+                    'retries': 5,
+                    'nocheckcertificate': True
+                }
+            }
+        
+        logger.warning(f"[{self.connection_id}] Nincs működő extractor!")
+        return None
+
+    async def smart_youtube_download(self, url: str) -> Optional[Path]:
+        """Intelligens YouTube letöltés diagnosztika alapon"""
+        
+        await self.send_progress(5, "🧠 Smart YouTube letöltés indítása...")
+        
+        # 1. Rendszer diagnosztika
+        diagnosis = await self.diagnose_ytdlp_system()
+        
+        # 2. Extractor tesztek
+        working_extractors = await self.test_youtube_extractors(url)
+        
+        # 3. Optimális konfiguráció
+        optimal_config = await self.create_optimal_config(working_extractors)
+        
+        if not optimal_config:
+            await self.send_progress(100, "❌ Nincs működő YouTube extractor")
+            return None
+        
+        # 4. Letöltés az optimális konfigurációval
+        await self.send_progress(70, f"📥 Smart letöltés: {optimal_config['method']}")
+        
+        video_id = await self.extract_video_id(url, "youtube")
+        temp_output_path = self.work_dir / f"smart_{video_id}.%(ext)s"
+        
+        # yt-dlp opciók összeállítása
+        ydl_opts = {
+            'outtmpl': str(temp_output_path),
+            'noplaylist': True,
+            'quiet': True,
+            'no_warnings': True,
+            'ignoreerrors': False
+            # NEM specifikálunk formátumot - hagyni yt-dlp-re
+        }
+        
+        # Extractor args hozzáadása
+        if 'extractor_args' in optimal_config:
+            ydl_opts['extractor_args'] = optimal_config['extractor_args']
+        
+        # További argumentumok
+        if 'additional_args' in optimal_config:
+            ydl_opts.update(optimal_config['additional_args'])
+        
+        # Progress hook
+        def progress_hook(d):
+            if d['status'] == 'downloading':
+                if 'downloaded_bytes' in d and ('total_bytes' in d or 'total_bytes_estimate' in d):
+                    total = d.get('total_bytes', d.get('total_bytes_estimate', 0))
+                    if total > 0:
+                        percent = min(95, 70 + (d['downloaded_bytes'] / total * 25))
+                        self.update_progress(percent, f"Smart letöltés: {d.get('_percent_str', '')} ({d.get('_speed_str', '')})")
+        
+        ydl_opts['progress_hooks'] = [progress_hook]
+        
+        # Letöltés futtatása
+        try:
+            loop = asyncio.get_event_loop()
+            with ThreadPoolExecutor() as executor:
+                def run_smart_yt_dlp():
+                    try:
+                        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                            ydl.download([url])
+                        return True
+                    except Exception as e:
+                        logger.error(f"[{self.connection_id}] Smart yt-dlp hiba: {e}")
+                        return False
+                        
+                success = await loop.run_in_executor(executor, run_smart_yt_dlp)
+            
+            # Sikerült-e a letöltés?
+            actual_files = list(self.work_dir.glob(f"smart_{video_id}.*"))
+            if success and actual_files and actual_files[0].stat().st_size > 0:
+                output_file = actual_files[0]
+                
+                # Másolás a rendszer downloads mappájába
+                system_output_path = SYSTEM_DOWNLOADS / output_file.name
+                try:
+                    shutil.copy2(output_file, system_output_path)
+                    await self.send_progress(100, "✅ Smart letöltés sikeres!")
+                    logger.info(f"[{self.connection_id}] Smart letöltés sikeres: {system_output_path}")
+                    return output_file
+                except Exception as e:
+                    logger.error(f"[{self.connection_id}] Másolási hiba: {e}")
+                    return output_file
+            else:
+                logger.error(f"[{self.connection_id}] Smart letöltés sikertelen")
+                return None
+                
+        except Exception as e:
+            logger.error(f"[{self.connection_id}] Smart letöltés kivétel: {e}")
+            return None
+
     async def cleanup(self):
         """Ideiglenes fájlok törlése"""
         try:
