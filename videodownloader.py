@@ -24,13 +24,23 @@ from config import SYSTEM_DOWNLOADS
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# User Agent lista
+# User Agent lista - kibővített
 USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Safari/605.1.15",
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36 Edg/119.0.0.0",
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/119.0",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/119.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+    "Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+]
+
+# Railway connection options - smart routing
+RAILWAY_PROXIES = [
+    None,  # Direct connection - prioritás
 ]
 
 class VideoDownloader:
@@ -49,6 +59,16 @@ class VideoDownloader:
         # Manager beállítása
         self.manager = manager
         
+        # Railway proxy rotation beállítás
+        self.proxy_index = 0
+        self.failed_proxies = set()
+        self.current_proxy = None
+        
+        # Rate limiting és request delay
+        self.last_request_time = 0
+        self.min_delay_between_requests = 3  # Railway bot detection bypass
+        self.request_count = 0
+        
         # Cookies könyvtár létrehozása
         self.cookies_dir = self.work_dir / "cookies"
         self.cookies_dir.mkdir(exist_ok=True)
@@ -60,6 +80,80 @@ class VideoDownloader:
         # Utolsó progress üzenet nyomon követése
         self._last_progress = 0
         self._progress_lock = threading.Lock()
+
+    def get_next_proxy(self) -> Optional[str]:
+        """Következő proxy lekérése a rotation listából"""
+        available_proxies = [p for i, p in enumerate(RAILWAY_PROXIES) if i not in self.failed_proxies]
+        
+        if not available_proxies:
+            # Ha minden proxy failelt, reseteljük és próbáljuk újra
+            logger.warning(f"[{self.connection_id}] Minden proxy sikertelen, reset...")
+            self.failed_proxies.clear()
+            available_proxies = RAILWAY_PROXIES.copy()
+        
+        if self.proxy_index >= len(available_proxies):
+            self.proxy_index = 0
+        
+        proxy = available_proxies[self.proxy_index]
+        self.proxy_index += 1
+        self.current_proxy = proxy
+        
+        logger.info(f"[{self.connection_id}] Proxy váltás: {proxy or 'Direct'}")
+        return proxy
+
+    def mark_proxy_failed(self, proxy: str):
+        """Proxy megjelölése sikertelenként"""
+        if proxy:
+            proxy_idx = None
+            for i, p in enumerate(RAILWAY_PROXIES):
+                if p == proxy:
+                    proxy_idx = i
+                    break
+            if proxy_idx is not None:
+                self.failed_proxies.add(proxy_idx)
+                logger.warning(f"[{self.connection_id}] Proxy sikertelen: {proxy}")
+
+    async def test_proxy_connection(self, proxy: str) -> bool:
+        """Proxy kapcsolat tesztelése"""
+        if not proxy:
+            return True  # Direct connection
+        
+        try:
+            import aiohttp
+            timeout = aiohttp.ClientTimeout(total=10)
+            connector = aiohttp.ProxyConnector.from_url(proxy) if proxy else None
+            
+            async with aiohttp.ClientSession(connector=connector, timeout=timeout) as session:
+                async with session.get('http://httpbin.org/ip') as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        logger.info(f"[{self.connection_id}] Proxy test sikeres: {proxy} -> IP: {data.get('origin', 'unknown')}")
+                        return True
+        except Exception as e:
+            logger.warning(f"[{self.connection_id}] Proxy test sikertelen: {proxy} - {e}")
+            return False
+        
+        return False
+
+    async def apply_rate_limiting(self):
+        """Railway bot detection bypass - intelligent request spacing"""
+        current_time = time.time()
+        time_since_last = current_time - self.last_request_time
+        
+        if time_since_last < self.min_delay_between_requests:
+            delay = self.min_delay_between_requests - time_since_last
+            # Progressive delay based on request count
+            progressive_delay = delay + (self.request_count * 0.5)
+            
+            logger.info(f"[{self.connection_id}] Rate limiting: {progressive_delay:.1f}s delay")
+            await asyncio.sleep(progressive_delay)
+        
+        self.last_request_time = time.time()
+        self.request_count += 1
+        
+        # Reset counter periodically
+        if self.request_count > 10:
+            self.request_count = 0
         
     async def download_audio(self, url: str, platform: str = None) -> Optional[Path]:
         """
@@ -297,44 +391,61 @@ class VideoDownloader:
                     )
 
     def create_cookies(self):
-        """Speciális cookie-k létrehozása a bot-védelmek megkerüléséhez"""
+        """Advanced cookie generation for Railway bot detection bypass"""
         cookies_path = self.cookies_dir / "cookies.txt"
-        # Cookie-k regenerálása minden alkalommal a frissesség érdekében
+        
         try:
             with open(cookies_path, "w") as f:
                 f.write("# Netscape HTTP Cookie File\n")
-                f.write(f"# Generated by VideoDownloader on {time.ctime()}\n")
+                f.write(f"# Advanced Railway Cookie Generation - {time.ctime()}\n")
                 
-                # YouTube fejlettebb cookie-k bot-detektálás ellen
                 current_time = int(time.time())
                 expire_time = current_time + 86400
                 
-                # Alapvető YouTube cookie-k
-                f.write(f".youtube.com\tTRUE\t/\tFALSE\t{expire_time}\tPREF\tid=f1=50000000&f6=8&hl=en&gl=US\n")
-                f.write(f".youtube.com\tTRUE\t/\tFALSE\t{expire_time}\tCONSENT\tYES+cb.{time.strftime('%Y%m%d', time.gmtime())}-11-p0.en+FX+{str(random.randint(100, 999))}\n")
+                # Multi-region browser simulation
+                regions = ['US', 'CA', 'GB', 'DE', 'FR', 'AU']
+                languages = ['en-US', 'en-GB', 'en-CA', 'fr-FR', 'de-DE']
                 
-                # Dinamikus session cookie-k
-                ysc_id = ''.join(random.choices('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789', k=11))
-                visitor_id = ''.join(random.choices('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_', k=26))
-                session_token = ''.join(random.choices('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_', k=43))
+                selected_region = random.choice(regions)
+                selected_lang = random.choice(languages)
                 
-                f.write(f".youtube.com\tTRUE\t/\tFALSE\t{expire_time}\tYSC\t{ysc_id}\n")
-                f.write(f".youtube.com\tTRUE\t/\tFALSE\t{expire_time}\tVISITOR_INFO1_LIVE\t{visitor_id}\n")
-                f.write(f".youtube.com\tTRUE\t/\tFALSE\t{expire_time}\tSIDCC\tAJ{session_token}\n")
-                f.write(f".youtube.com\tTRUE\t/\tFALSE\t{expire_time}\t__Secure-1PSID\tg.{session_token}\n")
-                f.write(f".youtube.com\tTRUE\t/\tFALSE\t{expire_time}\t__Secure-3PSID\tg.{session_token}\n")
+                # Advanced YouTube session cookies
+                f.write(f".youtube.com\tTRUE\t/\tFALSE\t{expire_time}\tPREF\tid=f1=50000000&f6=8&hl={selected_lang[:2]}&gl={selected_region}&f7=100\n")
+                f.write(f".youtube.com\tTRUE\t/\tFALSE\t{expire_time}\tCONSENT\tYES+cb.{time.strftime('%Y%m%d', time.gmtime())}-17-p0.{selected_lang[:2]}+FX+{str(random.randint(100, 999))}\n")
                 
-                # Időzóna és nyelvi beállítások
+                # Enhanced session tokens
+                visitor_info = ''.join(random.choices('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789', k=22))
+                session_id = ''.join(random.choices('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789', k=16))
+                
+                f.write(f".youtube.com\tTRUE\t/\tFALSE\t{expire_time}\tYSC\t{session_id}\n")
+                f.write(f".youtube.com\tTRUE\t/\tFALSE\t{expire_time}\tVISITOR_INFO1_LIVE\t{visitor_info}\n")
+                
+                # Browser-like authentication cookies
+                auth_token = ''.join(random.choices('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.-_', k=68))
+                f.write(f".youtube.com\tTRUE\t/\tFALSE\t{expire_time}\tSAPISID\t{auth_token[:45]}\n")
+                f.write(f".youtube.com\tTRUE\t/\tFALSE\t{expire_time}\tAPISID\t{auth_token[20:65]}\n")
+                f.write(f".youtube.com\tTRUE\t/\tFALSE\t{expire_time}\tHSID\t{auth_token[10:55]}\n")
+                f.write(f".youtube.com\tTRUE\t/\tFALSE\t{expire_time}\tSSID\t{auth_token[5:50]}\n")
+                
+                # Advanced tracking prevention
+                f.write(f".youtube.com\tTRUE\t/\tFALSE\t{expire_time}\t__Secure-1PAPISID\t{auth_token[:45]}\n")
+                f.write(f".youtube.com\tTRUE\t/\tFALSE\t{expire_time}\t__Secure-3PAPISID\t{auth_token[15:60]}\n")
+                
+                # Regional settings
                 f.write(f".youtube.com\tTRUE\t/\tFALSE\t{expire_time}\tGPS\t1\n")
-                f.write(f".youtube.com\tTRUE\t/\tFALSE\t{expire_time}\tNID\t511={(''.join(random.choices('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_', k=52)))}\n")
+                f.write(f".youtube.com\tTRUE\t/\tFALSE\t{current_time + 1800}\twide\t1\n")
                 
-                # További platformok cookie-jai
+                # Cross-domain consent
+                f.write(f".google.com\tTRUE\t/\tFALSE\t{expire_time}\tCONSENT\tYES+cb.{time.strftime('%Y%m%d', time.gmtime())}-17-p0.{selected_lang[:2]}+FX+{str(random.randint(100, 999))}\n")
+                f.write(f".google.com\tTRUE\t/\tFALSE\t{expire_time}\tNID\t511={(''.join(random.choices('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789', k=64)))}\n")
+                
+                # Additional platform cookies for legitimacy
                 f.write(f".twitter.com\tTRUE\t/\tFALSE\t{expire_time}\tct0\t{(''.join(random.choices('0123456789abcdef', k=32)))}\n")
                 f.write(f".facebook.com\tTRUE\t/\tFALSE\t{expire_time}\tdatr\t{(''.join(random.choices('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_', k=24)))}\n")
                 
-            logger.info(f"[{self.connection_id}] Cookie fájl létrehozva")
+            logger.info(f"[{self.connection_id}] Advanced Railway cookies created (region: {selected_region}, lang: {selected_lang})")
         except Exception as e:
-            logger.warning(f"[{self.connection_id}] Hiba a cookie fájl létrehozásakor: {e}")
+            logger.warning(f"[{self.connection_id}] Cookie creation error: {e}")
 
     async def extract_video_id(self, url: str, platform: str) -> str:
         """Platform-specifikus videó ID kinyerése"""
@@ -829,9 +940,9 @@ class VideoDownloader:
         return False
     
     async def test_youtube_extractors(self, test_url: str) -> Dict[str, bool]:
-        """Különböző YouTube extractor-ok tesztelése Railway környezetben"""
+        """Különböző YouTube extractor-ok tesztelése Railway környezetben proxy rotation-nel"""
         
-        await self.send_progress(20, "🧪 Extractor tesztek futtatása...")
+        await self.send_progress(20, "🧪 Extractor tesztek futtatása proxy rotation-nel...")
         
         extractors_to_test = [
             {
@@ -859,36 +970,66 @@ class VideoDownloader:
         results = {}
         
         for i, extractor in enumerate(extractors_to_test):
-            try:
-                await self.send_progress(25 + i*8, f"🔍 Teszt: {extractor['name']}")
-                
-                cmd = [
-                    'yt-dlp',
-                    '--no-download',
-                    '--get-title',
-                    '--socket-timeout', '20',
-                    '--retries', '2',
-                    '--no-check-certificate'
-                ] + extractor['args'] + [test_url]
-                
-                process = await asyncio.create_subprocess_exec(
-                    *cmd,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE
-                )
-                
-                stdout, stderr = await process.communicate()
-                
-                results[extractor['name']] = process.returncode == 0
-                
-                if process.returncode == 0:
-                    logger.info(f"[{self.connection_id}] ✅ {extractor['name']} működik!")
-                else:
-                    logger.warning(f"[{self.connection_id}] ❌ {extractor['name']} hiba: {stderr.decode()[:100]}")
+            # Minden extractor számára próbáljunk különböző proxy-kat
+            success = False
+            proxy_attempts = 0
+            max_proxy_attempts = min(3, len(RAILWAY_PROXIES))
+            
+            while not success and proxy_attempts < max_proxy_attempts:
+                try:
+                    # Rate limiting alkalmazása minden request előtt
+                    await self.apply_rate_limiting()
                     
-            except Exception as e:
-                results[extractor['name']] = False
-                logger.warning(f"[{self.connection_id}] ❌ {extractor['name']} kivétel: {e}")
+                    proxy = self.get_next_proxy()
+                    await self.send_progress(25 + i*8, f"🔍 Teszt: {extractor['name']} (proxy: {proxy or 'Direct'})")
+                    
+                    cmd = [
+                        'yt-dlp',
+                        '--no-download',
+                        '--get-title',  # Vissza az egyszerű title check-re
+                        '--socket-timeout', '15',
+                        '--retries', '1',
+                        '--no-check-certificate',
+                        '--user-agent', random.choice(USER_AGENTS)
+                    ]
+                    
+                    # Proxy hozzáadása ha van
+                    if proxy:
+                        cmd.extend(['--proxy', proxy])
+                    
+                    cmd.extend(extractor['args'] + [test_url])
+                    
+                    process = await asyncio.create_subprocess_exec(
+                        *cmd,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE
+                    )
+                    
+                    stdout, stderr = await process.communicate()
+                    
+                    if process.returncode == 0:
+                        success = True
+                        logger.info(f"[{self.connection_id}] ✅ {extractor['name']} működik proxy-val: {proxy or 'Direct'}!")
+                    else:
+                        error_msg = stderr.decode()[:100]
+                        logger.warning(f"[{self.connection_id}] ❌ {extractor['name']} hiba (proxy: {proxy or 'Direct'}): {error_msg}")
+                        
+                        # Ha bot detection, jelöljük meg a proxy-t sikertelenként
+                        if 'bot' in error_msg.lower() or 'sign in' in error_msg.lower():
+                            self.mark_proxy_failed(proxy)
+                    
+                    proxy_attempts += 1
+                    
+                    # Kis várás a próbálkozások között
+                    if not success and proxy_attempts < max_proxy_attempts:
+                        await asyncio.sleep(2)
+                        
+                except Exception as e:
+                    logger.warning(f"[{self.connection_id}] ❌ {extractor['name']} kivétel (proxy: {proxy or 'Direct'}): {e}")
+                    self.mark_proxy_failed(proxy)
+                    proxy_attempts += 1
+            
+            results[extractor['name']] = success
         
         return results
     
@@ -901,7 +1042,7 @@ class VideoDownloader:
         if working_extractors.get('minimal_basic'):
             logger.info(f"[{self.connection_id}] Optimális: Minimal basic")
             return {
-                'format': 'best',  # Egyszerű best formátum
+                'format': 'worst/best',  # Egyszerű fallback formátum
                 'method': 'minimal_basic',
                 'additional_args': {
                     'socket_timeout': 30,
@@ -995,15 +1136,25 @@ class VideoDownloader:
         video_id = await self.extract_video_id(url, "youtube")
         temp_output_path = self.work_dir / f"smart_{video_id}.%(ext)s"
         
-        # yt-dlp opciók összeállítása
+        # yt-dlp opciók összeállítása proxy support-tal
         ydl_opts = {
             'outtmpl': str(temp_output_path),
             'noplaylist': True,
             'quiet': True,
             'no_warnings': True,
-            'ignoreerrors': False
-            # NEM specifikálunk formátumot - hagyni yt-dlp-re
+            'ignoreerrors': False,
+            'user_agent': random.choice(USER_AGENTS)
         }
+        
+        # Formátum hozzáadása az optimális konfigurációból - de csak ha nem minimal_basic
+        if 'format' in optimal_config and optimal_config['method'] != 'minimal_basic':
+            ydl_opts['format'] = optimal_config['format']
+        # minimal_basic esetén hagyjuk yt-dlp-re az alapértelmezett formátumválasztást
+        
+        # Proxy hozzáadása ha van working proxy
+        if self.current_proxy:
+            ydl_opts['proxy'] = self.current_proxy
+            logger.info(f"[{self.connection_id}] Smart letöltés proxy-val: {self.current_proxy}")
         
         # Extractor args hozzáadása
         if 'extractor_args' in optimal_config:
@@ -1013,34 +1164,37 @@ class VideoDownloader:
         if 'additional_args' in optimal_config:
             ydl_opts.update(optimal_config['additional_args'])
         
-        # Progress hook
-        def progress_hook(d):
-            if d['status'] == 'downloading':
-                if 'downloaded_bytes' in d and ('total_bytes' in d or 'total_bytes_estimate' in d):
-                    total = d.get('total_bytes', d.get('total_bytes_estimate', 0))
-                    if total > 0:
-                        percent = min(95, 70 + (d['downloaded_bytes'] / total * 25))
-                        self.update_progress(percent, f"Smart letöltés: {d.get('_percent_str', '')} ({d.get('_speed_str', '')})")
-        
-        ydl_opts['progress_hooks'] = [progress_hook]
+        # Progress hook eltávolítva az asyncio konfliktus miatt
         
         # Letöltés futtatása
         try:
+            logger.info(f"[{self.connection_id}] Smart letöltés indítása: {url}")
+            logger.info(f"[{self.connection_id}] yt-dlp opciók: {list(ydl_opts.keys())}")
+            
             loop = asyncio.get_event_loop()
             with ThreadPoolExecutor() as executor:
                 def run_smart_yt_dlp():
                     try:
+                        logger.info(f"[{self.connection_id}] yt-dlp executor indítás...")
                         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                             ydl.download([url])
+                        logger.info(f"[{self.connection_id}] yt-dlp letöltés befejezve")
                         return True
                     except Exception as e:
                         logger.error(f"[{self.connection_id}] Smart yt-dlp hiba: {e}")
                         return False
                         
                 success = await loop.run_in_executor(executor, run_smart_yt_dlp)
+                logger.info(f"[{self.connection_id}] Executor eredmény: {success}")
             
             # Sikerült-e a letöltés?
             actual_files = list(self.work_dir.glob(f"smart_{video_id}.*"))
+            logger.info(f"[{self.connection_id}] Fájl keresés: smart_{video_id}.* -> {len(actual_files)} fájl")
+            
+            if actual_files:
+                for f in actual_files:
+                    logger.info(f"[{self.connection_id}] Talált fájl: {f.name} ({f.stat().st_size} bytes)")
+            
             if success and actual_files and actual_files[0].stat().st_size > 0:
                 output_file = actual_files[0]
                 

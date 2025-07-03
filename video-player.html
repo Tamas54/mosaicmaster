@@ -251,6 +251,16 @@
           <p class="text-sm text-gray-500 mt-1">Támogatott platformok: YouTube, Twitter, Facebook, Instagram, TikTok</p>
         </div>
         
+        <!-- Video Preview Panel -->
+        <div id="videoPreview" class="mb-4 hidden">
+          <div class="bg-gray-50 border rounded-lg p-4">
+            <h3 class="font-medium text-gray-700 mb-2">Videó előnézet:</h3>
+            <div id="previewContent" class="text-sm text-gray-600">
+              <!-- Előnézet tartalom -->
+            </div>
+          </div>
+        </div>
+        
         <div class="mb-4">
           <label class="block font-medium text-gray-700 mb-2">Platform (opcionális)</label>
           <div class="grid grid-cols-3 gap-2">
@@ -530,6 +540,91 @@
           selectedPlatform = button.dataset.platform;
         });
       });
+      
+      // Video preview functionality
+      const videoPreview = document.getElementById('videoPreview');
+      const previewContent = document.getElementById('previewContent');
+      
+      // URL input change handler for preview
+      videoUrlInput.addEventListener('input', debounce(async (e) => {
+        const url = e.target.value.trim();
+        if (url && url.startsWith('http')) {
+          await showVideoPreview(url);
+        } else {
+          hideVideoPreview();
+        }
+      }, 500));
+      
+      // Show video preview
+      async function showVideoPreview(url) {
+        try {
+          // Extract video ID for YouTube URLs
+          let videoId = null;
+          let platform = 'youtube';
+          
+          if (url.includes('youtube.com') || url.includes('youtu.be')) {
+            const urlObj = new URL(url);
+            if (url.includes('youtube.com')) {
+              videoId = urlObj.searchParams.get('v');
+            } else if (url.includes('youtu.be')) {
+              videoId = urlObj.pathname.split('/')[1];
+            }
+            
+            if (videoId) {
+              previewContent.innerHTML = `
+                <div class="flex items-start space-x-3">
+                  <img src="https://img.youtube.com/vi/${videoId}/mqdefault.jpg" 
+                       alt="Video thumbnail" 
+                       class="w-24 h-18 object-cover rounded"
+                       onerror="this.src='https://img.youtube.com/vi/${videoId}/default.jpg'">
+                  <div class="flex-1">
+                    <p class="font-medium text-gray-800">YouTube videó</p>
+                    <p class="text-xs text-gray-500 mt-1">Video ID: ${videoId}</p>
+                    <p class="text-xs text-gray-500">URL: ${url.substring(0, 50)}${url.length > 50 ? '...' : ''}</p>
+                  </div>
+                </div>
+              `;
+              videoPreview.classList.remove('hidden');
+              return;
+            }
+          }
+          
+          // For other platforms or if YouTube extraction failed
+          previewContent.innerHTML = `
+            <div class="flex items-center space-x-2">
+              <i data-lucide="link" class="w-5 h-5 text-blue-500"></i>
+              <div>
+                <p class="font-medium text-gray-800">${platform} videó</p>
+                <p class="text-xs text-gray-500">URL: ${url.substring(0, 60)}${url.length > 60 ? '...' : ''}</p>
+              </div>
+            </div>
+          `;
+          videoPreview.classList.remove('hidden');
+          lucide.createIcons();
+          
+        } catch (error) {
+          console.error('Preview error:', error);
+          hideVideoPreview();
+        }
+      }
+      
+      // Hide video preview
+      function hideVideoPreview() {
+        videoPreview.classList.add('hidden');
+      }
+      
+      // Debounce function
+      function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+          const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+          };
+          clearTimeout(timeout);
+          timeout = setTimeout(later, wait);
+        };
+      }
       
       // Közös videoURL validáló funkció
       function validateVideoUrl(url) {
